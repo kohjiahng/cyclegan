@@ -5,8 +5,8 @@ from configparser import ConfigParser
 config = ConfigParser()
 config.read('config.ini')
 
-IMG_RES = config.getint('main','IMG_RES')
-BATCH_SIZE = config.getint('main', 'BATCH_SIZE')
+IMG_RES = config.getint('params','IMG_RES')
+BATCH_SIZE = config.getint('params', 'BATCH_SIZE')
 
 class Generator(tf.keras.Model):
     def __init__(self, n_resblocks):

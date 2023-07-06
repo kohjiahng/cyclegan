@@ -6,7 +6,7 @@ from configparser import ConfigParser
 config = ConfigParser()
 config.read('config.ini')
 
-LAMBDA = config.getint('main', 'LAMBDA')
+LAMBDA = config.getint('params', 'LAMBDA')
 
 class CycleGAN:
     def __init__(self, gan_loss = 'bce', n_resblocks=6):

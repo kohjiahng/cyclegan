@@ -5,9 +5,9 @@ from configparser import ConfigParser
 config = ConfigParser()
 config.read('config.ini')
 
-LAMBDA = config.getint('main', 'LAMBDA')
-PATCH_SIZE = config.getint('main','PATCH_SIZE')
-BATCH_SIZE = config.getint('main','BATCH_SIZE')
+LAMBDA = config.getint('params', 'LAMBDA')
+PATCH_SIZE = config.getint('params','PATCH_SIZE')
+BATCH_SIZE = config.getint('params','BATCH_SIZE')
 
 class Discriminator(tf.keras.Model):
     def __init__(self):
