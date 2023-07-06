@@ -1,37 +1,52 @@
 import tensorflow as tf
 import os
 from dotenv import load_dotenv
-
+import numpy as np
 load_dotenv()
 
 PATCH_SIZE = int(os.getenv('PATCH_SIZE'))
 BATCH_SIZE = int(os.getenv('BATCH_SIZE'))
+IMG_SIZE = int(os.getenv('IMG_RES'))
 
+PATCHES_PER_IMAGE = (IMG_SIZE - PATCH_SIZE + 1) ** 2
 class Discriminator(tf.keras.Model):
     def __init__(self):
         super().__init__()
         self.model = tf.keras.Sequential()
-        self.model.add(tf.keras.layers.Input((PATCH_SIZE, PATCH_SIZE, 3), batch_size = BATCH_SIZE))
+        self.model.add(tf.keras.layers.Input((PATCH_SIZE, PATCH_SIZE, 3)))
 
         self.model.add(tf.keras.layers.Conv2D(64, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.BatchNormalization(axis=[0,1]))
+        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
         self.model.add(tf.keras.layers.LeakyReLU(0.2))
 
         self.model.add(tf.keras.layers.Conv2D(128, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.BatchNormalization(axis=[0,1]))
+        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
         self.model.add(tf.keras.layers.LeakyReLU(0.2))
         
         self.model.add(tf.keras.layers.Conv2D(256, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.BatchNormalization(axis=[0,1]))
+        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
         self.model.add(tf.keras.layers.LeakyReLU(0.2))
 
         self.model.add(tf.keras.layers.Conv2D(512, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.BatchNormalization(axis=[0,1]))
+        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
         self.model.add(tf.keras.layers.LeakyReLU(0.2))
 
         self.model.add(tf.keras.layers.Conv2D(1, kernel_size=(4,4), strides=1, padding='same'))
 
     def call(self, X):
-        return self.model(X)
+        patches = tf.image.extract_patches( # Extracts patches from X
+            X,
+            [1, PATCH_SIZE, PATCH_SIZE, 1],
+            strides=[1,1,1,1],
+            rates=[1,1,1,1],
+            padding='VALID'
+        )
+        patches = tf.reshape(patches, (-1,PATCH_SIZE,PATCH_SIZE,3))
+
+        chunk_size = 1
+        return self.model(patches)
+        return tf.stack([ # Splits operations into chunks to not exceed memory
+            self.model(chunk) for chunk in np.array_split(patches,-patches.shape[0] // -chunk_size, axis=0)
+        ])
 
 
