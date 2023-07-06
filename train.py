@@ -26,6 +26,7 @@ setA, setB = dataset['monet'], dataset['photo']
 
 logging.info('Starting Training ...')
 opt = tf.optimizers.Adam(0.002)
+opt.build(model.get_disc_trainable_variables() + model.get_gen_trainable_variables())
 for dataA, dataB in zip(setA, setB):
     imgA = dataA['image']
     imgB = dataB['image']
@@ -34,13 +35,11 @@ for dataA, dataB in zip(setA, setB):
     imgB = poolB.query(imgB)
     
     with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
-        #disc_tape.watch(model.get_disc_trainable_variables())
-        #gen_tape.watch(model.get_gen_trainable_variables())
-        model.forward(imgA)
-        model.backward(imgB)
+        realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
+        realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
-        gan_loss = -model.gan_loss() # Negate as discriminator tries to maximise this value
-        loss = model.total_loss()
+        gan_loss = -model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore) # Negate as discriminator tries to maximise this value
+        loss = model.cycle_loss(realA, realA_regen, realB, realB_regen) - gan_loss
 
     disc_grad = disc_tape.gradient(gan_loss, model.get_disc_trainable_variables())
     gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
@@ -48,7 +47,7 @@ for dataA, dataB in zip(setA, setB):
     opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
     opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
 
-    logging.info(loss)
+    logging.info(loss.numpy())
 
 
 

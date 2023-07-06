@@ -38,16 +38,16 @@ class CycleGAN:
         '''
         X = tf.cast(X, dtype=tf.float32)
 
-        self.realA = X
-        self.realAscore = self.discA(X)
-        self.fakeB = self.genF(X)
-        self.fakeBscore = self.discB(self.fakeB)
-        self.realA_regen = self.genG(self.fakeB)
+        realA = X
+        realAscore = self.discA(X)
+        fakeB = self.genF(X)
+        fakeBscore = self.discB(fakeB)
+        realA_regen = self.genG(fakeB)
 
-        return True
+        return realA, realAscore, fakeB, fakeBscore, realA_regen
 
     @tf.function
-    def backward(self, X):
+    def forward_B(self, X):
         '''
         Stores X in self.realB
         Passes X through self.discB and stores the output in self.realBscore
@@ -57,38 +57,38 @@ class CycleGAN:
         '''
         X = tf.cast(X, dtype=tf.float32)
 
-        self.realB = X
-        self.realBscore = self.discB(X)
-        self.fakeA = self.genG(X)
-        self.fakeAscore = self.discA(self.fakeA)
-        self.realB_regen = self.genF(self.fakeA)
+        realB = X
+        realBscore = self.discB(X)
+        fakeA = self.genG(X)
+        fakeAscore = self.discA(fakeA)
+        realB_regen = self.genF(fakeA)
 
-        return True
-
-    @tf.function
-    def gan_loss_A(self):
-        return self.gan_loss_fn(tf.zeros_like(self.realAscore), self.realAscore) + \
-                    self.gan_loss_fn(tf.ones_like(self.fakeAscore), self.fakeAscore)
+        return realB, realBscore, fakeA, fakeAscore, realB_regen 
 
     @tf.function
-    def gan_loss_B(self):
-        return self.gan_loss_fn(tf.zeros_like(self.realBscore), self.realBscore) + \
-                    self.gan_loss_fn(tf.ones_like(self.fakeBscore), self.fakeBscore)
+    def gan_loss_A(self, realAscore, fakeAscore):
+        return self.gan_loss_fn(tf.zeros_like(realAscore), realAscore) + \
+                    self.gan_loss_fn(tf.ones_like(fakeAscore), fakeAscore)
 
     @tf.function
-    def gan_loss(self):
-        return self.gan_loss_A() + self.gan_loss_B()
+    def gan_loss_B(self, realBscore, fakeBscore):
+        return self.gan_loss_fn(tf.zeros_like(realBscore), realBscore) + \
+                    self.gan_loss_fn(tf.ones_like(fakeBscore), fakeBscore)
+
+    @tf.function
+    def gan_loss(self, realAscore, fakeAscore, realBscore, fakeBscore):
+        return self.gan_loss_A(realAscore, fakeAscore) + self.gan_loss_B(realBscore, fakeBscore)
 
 
     @tf.function
-    def cycle_loss(self):
-        return self.cycle_loss_fn(self.realA, self.realA_regen) + \
-                    self.cycle_loss_fn(self.realB, self.realB_regen)
+    def cycle_loss(self, realA, realA_regen, realB, realB_regen):
+        return self.cycle_loss_fn(realA, realA_regen) + \
+                    self.cycle_loss_fn(realB, realB_regen)
     
     @tf.function
-    def total_loss(self):
-        gan_loss = self.gan_loss()
-        cycle_loss = self.cycle_loss()
+    def total_loss(self, realA, realAscore, realA_regen, realB, realBscore, realB_regen, fakeA, fakeAscore, fakeB, fakeBscore):
+        gan_loss = self.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
+        cycle_loss = self.cycle_loss(realA, realA_regen, realB, realB_regen)
         return gan_loss + LAMBDA * cycle_loss
 
     def infer_B(self, X): # A to B
