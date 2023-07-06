@@ -1,14 +1,14 @@
 import tensorflow as tf
-import os
-from dotenv import load_dotenv
 import numpy as np
-load_dotenv()
+from configparser import ConfigParser
 
-PATCH_SIZE = int(os.getenv('PATCH_SIZE'))
-BATCH_SIZE = int(os.getenv('BATCH_SIZE'))
-IMG_SIZE = int(os.getenv('IMG_RES'))
+config = ConfigParser()
+config.read('config.ini')
 
-PATCHES_PER_IMAGE = (IMG_SIZE - PATCH_SIZE + 1) ** 2
+LAMBDA = config.getint('main', 'LAMBDA')
+PATCH_SIZE = config.getint('main','PATCH_SIZE')
+BATCH_SIZE = config.getint('main','BATCH_SIZE')
+
 class Discriminator(tf.keras.Model):
     def __init__(self):
         super().__init__()

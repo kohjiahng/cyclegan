@@ -2,14 +2,18 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 from model import CycleGAN
 from utils import ImagePool
-import os
 import logging
-from dotenv import load_dotenv
+from configparser import ConfigParser
 
-load_dotenv()
+# ---------------------------------- CONFIG ---------------------------------- #
 
-BATCH_SIZE = int(os.getenv('BATCH_SIZE'))
-logging.basicConfig(filename='file.log',
+config = ConfigParser()
+config.read('config.ini')
+
+BATCH_SIZE = int(config.get('main','BATCH_SIZE'))
+
+# ------------------------------- LOGGING SETUP ------------------------------ #
+logging.basicConfig(filename='train.log',
                     level=logging.DEBUG,
                     format = '%(asctime)s:%(levelname)s:%(name)s:%(message)s',
                     filemode='w')
@@ -17,9 +21,11 @@ logging.basicConfig(filename='file.log',
 
 logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 
+# ---------------------------------------------------------------------------- #
+#                        DATA LOADING AND PREPROCESSING                        #
+# ---------------------------------------------------------------------------- #
 
 model = CycleGAN('bce', n_resblocks=6)
-poolA, poolB = ImagePool(50), ImagePool(50)
 
 dataset = tfds.load('monet',batch_size=BATCH_SIZE,shuffle_files=True)
 setA, setB = dataset['monet'], dataset['photo']
@@ -30,18 +36,20 @@ def preprocess(X):
 setA = setA.map(preprocess)
 setB = setB.map(preprocess)
 
-logging.info('Starting Training ...')
+# ---------------------------------------------------------------------------- #
+#                                   TRAINING                                   #
+# ---------------------------------------------------------------------------- #
+
+# ------------------------------ TRAINING SETUP ------------------------------ #
+poolA, poolB = ImagePool(50), ImagePool(50)
 disc_opt = tf.optimizers.Adam(0.002)
 gen_opt = tf.optimizers.Adam(0.002)
 disc_opt.build(model.get_disc_trainable_variables())
 gen_opt.build(model.get_gen_trainable_variables())
-# opt.build(model.get_disc_trainable_variables() + model.get_gen_trainable_variables())
 
+# ------------------------------- TRAINING STEP ------------------------------ #
 def train_one_epoch():
-    for dataA, dataB in zip(setA, setB):
-        imgA = tf.cast(dataA, dtype=tf.float32)
-        imgB = tf.cast(dataB,dtype=tf.float32)
-
+    for imgA, imgB in zip(setA, setB):
         imgA = poolA.query(imgA)
         imgB = poolB.query(imgB)
         
@@ -60,5 +68,8 @@ def train_one_epoch():
 
         logging.info(loss.numpy())
 
+# --------------------------------- TRAINING --------------------------------- #
+
+logging.info('Starting Training ...')
 for _ in range(10):
     train_one_epoch()

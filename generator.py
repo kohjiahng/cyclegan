@@ -1,12 +1,12 @@
 import tensorflow as tf
 from resblock import ResBlock
-import os
-from dotenv import load_dotenv
+from configparser import ConfigParser
 
-load_dotenv()
+config = ConfigParser()
+config.read('config.ini')
 
-IMG_RES = int(os.getenv('IMG_RES'))
-BATCH_SIZE = int(os.getenv('BATCH_SIZE'))
+IMG_RES = config.getint('main','IMG_RES')
+BATCH_SIZE = config.getint('main', 'BATCH_SIZE')
 
 class Generator(tf.keras.Model):
     def __init__(self, n_resblocks):

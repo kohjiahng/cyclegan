@@ -1,12 +1,12 @@
 import tensorflow as tf
 from generator import Generator
 from discriminator import Discriminator
-from dotenv import load_dotenv
-import os
+from configparser import ConfigParser
 
-load_dotenv()
+config = ConfigParser()
+config.read('config.ini')
 
-LAMBDA = int(os.getenv('LAMBDA'))
+LAMBDA = config.getint('main', 'LAMBDA')
 
 class CycleGAN:
     def __init__(self, gan_loss = 'bce', n_resblocks=6):
