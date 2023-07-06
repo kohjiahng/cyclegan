@@ -37,16 +37,12 @@ class Discriminator(tf.keras.Model):
         patches = tf.image.extract_patches( # Extracts patches from X
             X,
             [1, PATCH_SIZE, PATCH_SIZE, 1],
-            strides=[1,1,1,1],
+            strides=[1,32,32,1], # Strides to avoid OOM
             rates=[1,1,1,1],
             padding='VALID'
         )
         patches = tf.reshape(patches, (-1,PATCH_SIZE,PATCH_SIZE,3))
 
-        chunk_size = 1
         return self.model(patches)
-        return tf.stack([ # Splits operations into chunks to not exceed memory
-            self.model(chunk) for chunk in np.array_split(patches,-patches.shape[0] // -chunk_size, axis=0)
-        ])
 
 

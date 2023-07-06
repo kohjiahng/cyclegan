@@ -30,14 +30,6 @@ class CycleGAN:
 
     @tf.function
     def forward_A(self, X):
-        '''
-        Stores X in self.realA
-        Passes X through self.discA and stores the output in self.realAscore
-        Passes X through self.genF and stores the output in self.fakeB
-        Passes self.fakeB through self.discB and stores the output in self.fakeBscore
-        '''
-        X = tf.cast(X, dtype=tf.float32)
-
         realA = X
         realAscore = self.discA(X)
         fakeB = self.genF(X)
@@ -48,15 +40,6 @@ class CycleGAN:
 
     @tf.function
     def forward_B(self, X):
-        '''
-        Stores X in self.realB
-        Passes X through self.discB and stores the output in self.realBscore
-        Passes X through self.genG and stores the output in self.fakeA
-        Passes self.fakeA through self.discA and stores the output in self.fakeAscore
-        Passes self.fakeA through self.genF and stores the output in self.realB_regen
-        '''
-        X = tf.cast(X, dtype=tf.float32)
-
         realB = X
         realBscore = self.discB(X)
         fakeA = self.genG(X)

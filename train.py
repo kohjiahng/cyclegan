@@ -24,31 +24,41 @@ poolA, poolB = ImagePool(50), ImagePool(50)
 dataset = tfds.load('monet',batch_size=BATCH_SIZE,shuffle_files=True)
 setA, setB = dataset['monet'], dataset['photo']
 
+def preprocess(X):
+    return tf.cast(X['image'], dtype=tf.float32) / 255
+
+setA = setA.map(preprocess)
+setB = setB.map(preprocess)
+
 logging.info('Starting Training ...')
-opt = tf.optimizers.Adam(0.002)
-opt.build(model.get_disc_trainable_variables() + model.get_gen_trainable_variables())
-for dataA, dataB in zip(setA, setB):
-    imgA = dataA['image']
-    imgB = dataB['image']
+disc_opt = tf.optimizers.Adam(0.002)
+gen_opt = tf.optimizers.Adam(0.002)
+disc_opt.build(model.get_disc_trainable_variables())
+gen_opt.build(model.get_gen_trainable_variables())
+# opt.build(model.get_disc_trainable_variables() + model.get_gen_trainable_variables())
 
-    imgA = poolA.query(imgA)
-    imgB = poolB.query(imgB)
-    
-    with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
-        realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
-        realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
+def train_one_epoch():
+    for dataA, dataB in zip(setA, setB):
+        imgA = tf.cast(dataA, dtype=tf.float32)
+        imgB = tf.cast(dataB,dtype=tf.float32)
 
-        gan_loss = -model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore) # Negate as discriminator tries to maximise this value
-        loss = model.cycle_loss(realA, realA_regen, realB, realB_regen) - gan_loss
+        imgA = poolA.query(imgA)
+        imgB = poolB.query(imgB)
+        
+        with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
+            realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
+            realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
-    disc_grad = disc_tape.gradient(gan_loss, model.get_disc_trainable_variables())
-    gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
+            gan_loss = -model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore) # Negate as discriminator tries to maximise this value
+            loss = model.cycle_loss(realA, realA_regen, realB, realB_regen) - gan_loss
 
-    opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
-    opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
+        disc_grad = disc_tape.gradient(gan_loss, model.get_disc_trainable_variables())
+        gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
 
-    logging.info(loss.numpy())
+        disc_opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
+        gen_opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
 
+        logging.info(loss.numpy())
 
-
-
+for _ in range(10):
+    train_one_epoch()
