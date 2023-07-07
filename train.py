@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from model import CycleGAN
-from utils import ImagePool
+from utils import plot_images_with_scores
 import logging
 from configparser import ConfigParser
 import wandb
@@ -20,13 +20,17 @@ config.read('config.ini')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 NUM_EPOCHS = config.getint('params', 'NUM_EPOCHS')
 IMG_LOG_FREQ = config.getint('settings', 'IMG_LOG_FREQ')
-IMG_LOG_NUM = config.getint('settings', 'IMG_LOG_NUM')
+IMG_FIXED_LOG_NUM = config.getint('settings', 'IMG_FIXED_LOG_NUM')
+IMG_RANDOM_LOG_NUM = config.getint('settings', 'IMG_RANDOM_LOG_NUM')
 
 # ------------------------------- LOGGING SETUP ------------------------------ #
 logging.basicConfig(filename='train.log',
                     level=logging.DEBUG,
                     format = '%(asctime)s:%(levelname)s:%(name)s:%(message)s',
                     filemode='w')
+
+# Remove annoying matplotlib.font-manager logs
+logging.getLogger('matplotlib.font_manager').disabled = True
 
 logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 wandb.init(
@@ -50,12 +54,12 @@ setA, setB = dataset['photo'], dataset['monet']
 def preprocess(X):
     return tf.cast(X['image'], dtype=tf.float32) / 255
 
-setA = setA.map(preprocess).take(10)
-setB = setB.map(preprocess).take(10)
+setA = setA.map(preprocess)
+setB = setB.map(preprocess)
 
 # Sample images to log later
-sampleA = setA.take(5)
-sampleB = setB.take(5)
+sampleA = setA.take(IMG_FIXED_LOG_NUM)
+sampleB = setB.take(IMG_FIXED_LOG_NUM)
 
 setA = setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
 setA = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
@@ -116,42 +120,26 @@ def train_one_epoch(step):
 
     logging.info(f"Completed epoch {step}, time = {time.perf_counter() - start_time}s")
 
-    # TODO: log realA/fakeA/realA_regen triples with scores
-    # TODO: log realB/fakeB/realB_regen triples with scores
-    
 # ---------------------------------------------------------------------------- #
 #                                 TRAINING LOOP                                #
 # ---------------------------------------------------------------------------- #
-
 logging.info('Starting Training ...')
 for step in range(1, NUM_EPOCHS+1):
-    # train_one_epoch(step)
+    train_one_epoch(step)
 
-    # Log images
-    fig, ax = plt.subplots(3,8,figsize=(3*8,8*8))
-    rand_sampleA = setA.take(3)
+    # ------------------------------ Logging images ------------------------------ #
 
-    realscore = tf.reduce_mean(model.discA(img), axis=(1,2,3))
-    fake = model.infer_A(img)
-    fakescore = tf.reduce_mean(model.discB(img), axis=(1,2,3))
-    regen = model.infer_B(img)
-    regenscore = tf.reduce_mean(model.discA(regen), axis=(1,2,3))
+    if (step - 1) % IMG_LOG_FREQ == 0:
+        rand_sampleA = sampleA.take(IMG_RANDOM_LOG_NUM) 
+        rand_sampleB = sampleB.take(IMG_RANDOM_LOG_NUM)
 
-    for idx, img in enumerate(sampleA.concatenate(rand_sampleA)):
-        realscore = model.discA(img)
-        ax[0,idx].imshow(img[idx,:,:,:])
-        ax[0,idx].set_title(f"Score: {realscore[idx]:.2}")
-        ax[0,idx].axis('off')
+        photo = tf.concat(list(sampleA.concatenate(rand_sampleA)), axis=0)
+        monet = tf.concat(list(sampleB.concatenate(rand_sampleB)), axis=0)
+        
+        photo_fig = plot_images_with_scores(photo, model)
+        monet_fig = plot_images_with_scores(monet, model)
 
-        out = model.infer_A(img)
-        ax[1,idx].imshow(out[0,:,:,:])
-        ax[0,idx].set_title(f"Score: {fakescore[idx]:.2}")
-        ax[1,idx].axis('off')
-
-        regen = model.infer_B(out)
-        ax[2,idx].imshow(regen[0,:,:,:])
-        ax[0,idx].set_title(f"Score: {regenscore[idx]:.2}")
-        ax[2,idx].axis('off')
-
-    fig.subplots_adjust(wspace=0,hspace=0)
-    wandb.log({'Real Images':fig})
+        wandb.log({
+            'Photo': photo_fig,
+            'Monet': monet_fig
+        })
