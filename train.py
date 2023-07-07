@@ -1,44 +1,55 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from model import CycleGAN
-from utils import plot_images_with_scores
+from utils import plot_images_with_scores, infer_type
 import logging
 from configparser import ConfigParser
 import wandb
 import time
-import matplotlib.pyplot as plt
+import ast
+
+# ---------------------------------------------------------------------------- #
+#                                     SETUP                                    #
+# ---------------------------------------------------------------------------- #
+
 
 # ---------------------------------- CONFIG ---------------------------------- #
 
-config = ConfigParser(defaults={
-    'IMG_LOG_FREQ': 1,
-    'IMG_LOG_NUM': 5
-})
+config = ConfigParser()
 
 config.read('config.ini')
 
+WANDB_PROJECT_NAME = config.get('settings','WANDB_PROJECT_NAME')
+LOG_FILE = config.get('settings', 'LOG_FILE')
+
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 NUM_EPOCHS = config.getint('params', 'NUM_EPOCHS')
+N_RES_BLOCKS = config.getint('params', 'N_RES_BLOCKS')
+DISC_LR = config.getfloat('params', 'DISC_LR')
+GEN_LR = config.getfloat('params', 'GEN_LR')
+GAN_LOSS_FN = config.get('params', 'GAN_LOSS_FN')
+
 IMG_LOG_FREQ = config.getint('settings', 'IMG_LOG_FREQ')
 IMG_FIXED_LOG_NUM = config.getint('settings', 'IMG_FIXED_LOG_NUM')
 IMG_RANDOM_LOG_NUM = config.getint('settings', 'IMG_RANDOM_LOG_NUM')
 
 # ------------------------------- LOGGING SETUP ------------------------------ #
-logging.basicConfig(filename='train.log',
+logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
                     format = '%(asctime)s:%(levelname)s:%(name)s:%(message)s',
                     filemode='w')
 
-# Remove annoying matplotlib.font-manager logs
+# Remove annoying matplotlib.font_manager logs
 logging.getLogger('matplotlib.font_manager').disabled = True
 
 logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 wandb.init(
-    project='CycleGAN-Monet',
+    project=WANDB_PROJECT_NAME,
     config=dict(map(
-        lambda item: (item[0], (float(item[1]) if item[1].isnumeric() else item[1])),
+        lambda item: (item[0], infer_type(item[1])), # infer type of item[1]
         config.items('params'))
-    )
+    ),
+    settings=wandb.Settings(code_dir='.') # Code logging
 )
 
 
@@ -46,7 +57,7 @@ wandb.init(
 #                        DATA LOADING AND PREPROCESSING                        #
 # ---------------------------------------------------------------------------- #
 
-model = CycleGAN('bce', n_resblocks=6)
+model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS)
 
 dataset = tfds.load('monet',batch_size=BATCH_SIZE)
 setA, setB = dataset['photo'], dataset['monet']
@@ -68,8 +79,8 @@ setA = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
 #                                TRAINING SETUP                                #
 # ---------------------------------------------------------------------------- #
 
-disc_opt = tf.optimizers.Adam(0.002)
-gen_opt = tf.optimizers.Adam(0.002)
+disc_opt = tf.optimizers.Adam(DISC_LR)
+gen_opt = tf.optimizers.Adam(GEN_LR)
 disc_opt.build(model.get_disc_trainable_variables())
 gen_opt.build(model.get_gen_trainable_variables())
 
@@ -78,6 +89,8 @@ gen_opt.build(model.get_gen_trainable_variables())
 # ---------------------------------------------------------------------------- #
 
 def train_one_epoch(step):
+    logging.info(f'Training Epoch {step}...')
+
     start_time = time.perf_counter()
 
     disc_loss_metric = tf.metrics.Mean("disc_loss")
@@ -111,14 +124,16 @@ def train_one_epoch(step):
 
 
     # ---------------------------------- LOGGING --------------------------------- #
+    time_taken = time.perf_counter() - start_time
+    logging.info(f"Completed epoch {step}, time = {time_taken}s")
     wandb.log({
         'disc_loss': disc_loss_metric.result(),
         'gan_loss': gan_loss_metric.result(),
         'cycle_loss': cycle_loss_metric.result(),
-        'loss': loss_metric.result()
+        'loss': loss_metric.result(),
+        'time_per_epoch': time_taken
     }, step=step)
 
-    logging.info(f"Completed epoch {step}, time = {time.perf_counter() - start_time}s")
 
 # ---------------------------------------------------------------------------- #
 #                                 TRAINING LOOP                                #
@@ -130,6 +145,8 @@ for step in range(1, NUM_EPOCHS+1):
     # ------------------------------ Logging images ------------------------------ #
 
     if (step - 1) % IMG_LOG_FREQ == 0:
+        logging.info(f'Logging Images...')
+
         rand_sampleA = sampleA.take(IMG_RANDOM_LOG_NUM) 
         rand_sampleB = sampleB.take(IMG_RANDOM_LOG_NUM)
 

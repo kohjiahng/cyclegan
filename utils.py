@@ -52,3 +52,13 @@ def plot_images_with_scores(images, model):
     fig.subplots_adjust(wspace=0,hspace=0.1)
 
     return fig
+
+# ------------ infer_type convenience function for config logging ------------ #
+def infer_type(val):
+    try:
+        return int(val)
+    except ValueError:
+        try:
+            return float(val)
+        except ValueError:
+            return val

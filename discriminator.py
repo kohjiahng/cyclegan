@@ -7,6 +7,7 @@ config.read('config.ini')
 LAMBDA = config.getint('params', 'LAMBDA')
 PATCH_SIZE = config.getint('params','PATCH_SIZE')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
+PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
 
 class Discriminator(tf.keras.Model):
     def __init__(self):
@@ -36,7 +37,7 @@ class Discriminator(tf.keras.Model):
         patches = tf.image.extract_patches( # Extracts patches from X
             X,
             [1, PATCH_SIZE, PATCH_SIZE, 1],
-            strides=[1,32,32,1], # Strides to avoid OOM
+            strides=[1,PATCHGAN_STRIDES,PATCHGAN_STRIDES,1], # Strides to avoid OOM
             rates=[1,1,1,1],
             padding='VALID'
         )

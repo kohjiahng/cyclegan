@@ -10,11 +10,13 @@ config.read('config.ini')
 POOL_SIZE = config.getint('params', 'POOL_SIZE')
 LAMBDA = config.getint('params', 'LAMBDA')
 
-class CycleGAN:
-    def __init__(self, gan_loss = 'bce', n_resblocks=6):
+class CycleGAN(tf.keras.Model):
+    def __init__(self, gan_loss_fn = 'bce', n_resblocks=6):
         '''
-        gan_loss: either 'mse' or 'bce'
+        gan_loss_fn: either 'mse' or 'bce'
         '''
+        super().__init__()
+
         self.genF = Generator(n_resblocks)
         self.discB = Discriminator()
 
@@ -24,9 +26,9 @@ class CycleGAN:
         self.poolA = ImagePool(POOL_SIZE)
         self.poolB = ImagePool(POOL_SIZE)
 
-        if gan_loss == 'mse':
+        if gan_loss_fn == 'mse':
             self.gan_loss_fn = tf.keras.losses.MeanSquaredError() 
-        elif gan_loss == 'bce':
+        elif gan_loss_fn == 'bce':
             self.gan_loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         else:
             raise NotImplementedError
