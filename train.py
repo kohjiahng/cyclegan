@@ -6,7 +6,6 @@ import logging
 from configparser import ConfigParser
 import wandb
 import time
-import ast
 
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
@@ -33,14 +32,18 @@ IMG_LOG_FREQ = config.getint('settings', 'IMG_LOG_FREQ')
 IMG_FIXED_LOG_NUM = config.getint('settings', 'IMG_FIXED_LOG_NUM')
 IMG_RANDOM_LOG_NUM = config.getint('settings', 'IMG_RANDOM_LOG_NUM')
 
+CKPT_FREQ = config.getint('settings', 'CKPT_FREQ')
+CKPT_DIR = config.get('settings', 'CKPT_DIR')
+
 # ------------------------------- LOGGING SETUP ------------------------------ #
 logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
                     format = '%(asctime)s:%(levelname)s:%(name)s:%(message)s',
                     filemode='w')
 
-# Remove annoying matplotlib.font_manager logs
-logging.getLogger('matplotlib.font_manager').disabled = True
+# Remove annoying matplotlib.font_manager and PIL logs
+logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+logging.getLogger('PIL').setLevel(logging.WARNING)
 
 logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 wandb.init(
@@ -160,3 +163,10 @@ for step in range(1, NUM_EPOCHS+1):
             'Photo': photo_fig,
             'Monet': monet_fig
         })
+
+    # ---------------------------- Creating checkpoint --------------------------- #
+    if step > 1 and (step - 1) % CKPT_FREQ == 0:
+        logging.info('Creating checkpoint...')
+        ckpt_path = f"{CKPT_DIR}/epoch{step}.h5"
+        model.save_weights(ckpt_path)
+        wandb.save(ckpt_path)
