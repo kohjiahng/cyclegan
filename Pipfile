@@ -10,6 +10,7 @@ python-dotenv = "*"
 tensorflow-datasets = "*"
 configparser = "*"
 wandb = "*"
+matplotlib = "*"
 
 [dev-packages]
 ipykernel = "*"

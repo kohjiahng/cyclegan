@@ -6,6 +6,7 @@ import logging
 from configparser import ConfigParser
 import wandb
 import time
+import matplotlib.pyplot as plt
 
 # ---------------------------------- CONFIG ---------------------------------- #
 
@@ -43,14 +44,21 @@ wandb.init(
 
 model = CycleGAN('bce', n_resblocks=6)
 
-dataset = tfds.load('monet',batch_size=BATCH_SIZE,shuffle_files=True)
-setA, setB = dataset['monet'], dataset['photo']
+dataset = tfds.load('monet',batch_size=BATCH_SIZE)
+setA, setB = dataset['photo'], dataset['monet']
 
 def preprocess(X):
     return tf.cast(X['image'], dtype=tf.float32) / 255
 
-setA = setA.map(preprocess)
-setB = setB.map(preprocess)
+setA = setA.map(preprocess).take(10)
+setB = setB.map(preprocess).take(10)
+
+# Sample images to log later
+sampleA = setA.take(5)
+sampleB = setB.take(5)
+
+setA = setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
+setA = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
 
 # ---------------------------------------------------------------------------- #
 #                                TRAINING SETUP                                #
@@ -117,4 +125,33 @@ def train_one_epoch(step):
 
 logging.info('Starting Training ...')
 for step in range(1, NUM_EPOCHS+1):
-    train_one_epoch(step)
+    # train_one_epoch(step)
+
+    # Log images
+    fig, ax = plt.subplots(3,8,figsize=(3*8,8*8))
+    rand_sampleA = setA.take(3)
+
+    realscore = tf.reduce_mean(model.discA(img), axis=(1,2,3))
+    fake = model.infer_A(img)
+    fakescore = tf.reduce_mean(model.discB(img), axis=(1,2,3))
+    regen = model.infer_B(img)
+    regenscore = tf.reduce_mean(model.discA(regen), axis=(1,2,3))
+
+    for idx, img in enumerate(sampleA.concatenate(rand_sampleA)):
+        realscore = model.discA(img)
+        ax[0,idx].imshow(img[idx,:,:,:])
+        ax[0,idx].set_title(f"Score: {realscore[idx]:.2}")
+        ax[0,idx].axis('off')
+
+        out = model.infer_A(img)
+        ax[1,idx].imshow(out[0,:,:,:])
+        ax[0,idx].set_title(f"Score: {fakescore[idx]:.2}")
+        ax[1,idx].axis('off')
+
+        regen = model.infer_B(out)
+        ax[2,idx].imshow(regen[0,:,:,:])
+        ax[0,idx].set_title(f"Score: {regenscore[idx]:.2}")
+        ax[2,idx].axis('off')
+
+    fig.subplots_adjust(wspace=0,hspace=0)
+    wandb.log({'Real Images':fig})
