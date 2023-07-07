@@ -1,4 +1,5 @@
 import tensorflow as tf
+from utils import ImagePool
 from generator import Generator
 from discriminator import Discriminator
 from configparser import ConfigParser
@@ -6,6 +7,7 @@ from configparser import ConfigParser
 config = ConfigParser()
 config.read('config.ini')
 
+POOL_SIZE = config.getint('params', 'POOL_SIZE')
 LAMBDA = config.getint('params', 'LAMBDA')
 
 class CycleGAN:
@@ -19,6 +21,9 @@ class CycleGAN:
         self.genG = Generator(n_resblocks)
         self.discA = Discriminator()
 
+        self.poolA = ImagePool(POOL_SIZE)
+        self.poolB = ImagePool(POOL_SIZE)
+
         if gan_loss == 'mse':
             self.gan_loss_fn = tf.keras.losses.MeanSquaredError() 
         elif gan_loss == 'bce':
@@ -28,6 +33,7 @@ class CycleGAN:
         
         self.cycle_loss_fn = tf.keras.losses.MeanAbsoluteError()
 
+    # ---------------------------- TRAINING FUNCTIONS ---------------------------- #
     @tf.function
     def forward_A(self, X):
         realA = X
@@ -47,6 +53,30 @@ class CycleGAN:
         realB_regen = self.genF(fakeA)
 
         return realB, realBscore, fakeA, fakeAscore, realB_regen 
+
+    # ---------------------------------- LOSSES ---------------------------------- #
+    @tf.function
+    def disc_loss_A(self, realAscore, fakeA):
+        # Same as gan_loss_A, except fakeA is randomly replaced from a buffer
+        fakeA = self.poolA.query(fakeA)
+
+        fakeAscore = self.discA(fakeA)
+        return self.gan_loss_fn(tf.zeros_like(realAscore), realAscore) + \
+                    self.gan_loss_fn(tf.ones_like(fakeAscore), fakeAscore)
+
+    @tf.function
+    def disc_loss_B(self, realBscore, fakeB):
+        # Same as gan_loss_B, except fakeB is randomly replaced from a buffer
+        fakeB = self.poolB.query(fakeB)
+
+        fakeBscore = self.discB(fakeB)
+        return self.gan_loss_fn(tf.zeros_like(realBscore), realBscore) + \
+                    self.gan_loss_fn(tf.ones_like(fakeBscore), fakeBscore)
+    
+    @tf.function
+    def disc_loss(self, realAscore, fakeA, realBscore, fakeB):
+        return self.disc_loss_A(realAscore, fakeA) + self.disc_loss_B(realBscore, fakeB)
+
 
     @tf.function
     def gan_loss_A(self, realAscore, fakeAscore):
@@ -74,6 +104,7 @@ class CycleGAN:
         cycle_loss = self.cycle_loss(realA, realA_regen, realB, realB_regen)
         return gan_loss + LAMBDA * cycle_loss
 
+    # ---------------------------------- HELPERS --------------------------------- #
     def infer_B(self, X): # A to B
         return self.genF(X)
     

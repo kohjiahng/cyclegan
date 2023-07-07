@@ -31,7 +31,7 @@ logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 wandb.init(
     project='CycleGAN-Monet',
     config=dict(map(
-        lambda key, value: (key, (float(value) if value.isnumeric() else value)),
+        lambda item: (item[0], (float(item[1]) if item[1].isnumeric() else item[1])),
         config.items('params'))
     )
 )
@@ -56,7 +56,6 @@ setB = setB.map(preprocess)
 #                                TRAINING SETUP                                #
 # ---------------------------------------------------------------------------- #
 
-poolA, poolB = ImagePool(50), ImagePool(50)
 disc_opt = tf.optimizers.Adam(0.002)
 gen_opt = tf.optimizers.Adam(0.002)
 disc_opt.build(model.get_disc_trainable_variables())
@@ -69,35 +68,39 @@ gen_opt.build(model.get_gen_trainable_variables())
 def train_one_epoch(step):
     start_time = time.perf_counter()
 
+    disc_loss_metric = tf.metrics.Mean("disc_loss")
     gan_loss_metric = tf.metrics.Mean("gan_loss")
     cycle_loss_metric = tf.metrics.Mean("cycle_loss")
     loss_metric = tf.metrics.Mean("loss")
 
     # --------------------------------- TRAINING --------------------------------- #
     for imgA, imgB in zip(setA, setB):
-        imgA = poolA.query(imgA)
-        imgB = poolB.query(imgB)
         
         with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
             realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
             realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
-            gan_loss = -model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore) # Negate as discriminator tries to maximise this value
+            disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB)
+
+            gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
             cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
-            loss = cycle_loss - gan_loss
+            loss = cycle_loss + gan_loss
             
-        disc_grad = disc_tape.gradient(gan_loss, model.get_disc_trainable_variables())
+        disc_grad = disc_tape.gradient(disc_loss, model.get_disc_trainable_variables())
         gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
 
         disc_opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
         gen_opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
 
-        gan_loss_metric(-gan_loss)     
+        disc_loss_metric(disc_loss)
+        gan_loss_metric(gan_loss)     
         cycle_loss_metric(cycle_loss)
         loss_metric(loss)
 
+
     # ---------------------------------- LOGGING --------------------------------- #
     wandb.log({
+        'disc_loss': disc_loss_metric.result(),
         'gan_loss': gan_loss_metric.result(),
         'cycle_loss': cycle_loss_metric.result(),
         'loss': loss_metric.result()
