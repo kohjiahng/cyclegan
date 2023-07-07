@@ -27,7 +27,7 @@ N_RES_BLOCKS = config.getint('params', 'N_RES_BLOCKS')
 DISC_LR = config.getfloat('params', 'DISC_LR')
 GEN_LR = config.getfloat('params', 'GEN_LR')
 GAN_LOSS_FN = config.get('params', 'GAN_LOSS_FN')
-
+LAMBDA = config.getfloat('params', 'LAMBDA')
 IMG_LOG_FREQ = config.getint('settings', 'IMG_LOG_FREQ')
 IMG_FIXED_LOG_NUM = config.getint('settings', 'IMG_FIXED_LOG_NUM')
 IMG_RANDOM_LOG_NUM = config.getint('settings', 'IMG_RANDOM_LOG_NUM')
@@ -112,7 +112,7 @@ def train_one_epoch(step):
 
             gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
             cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
-            loss = cycle_loss + gan_loss
+            loss = cycle_loss + LAMBDA * gan_loss
             
         disc_grad = disc_tape.gradient(disc_loss, model.get_disc_trainable_variables())
         gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
@@ -176,4 +176,5 @@ ckpt_path = f"{CKPT_DIR}/final.h5"
 model.save_weights(ckpt_path)
 wandb.save(ckpt_path)
 
+wandb.save(LOG_FILE)
 logging.info('Finished Training!')
