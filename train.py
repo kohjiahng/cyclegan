@@ -170,3 +170,10 @@ for step in range(1, NUM_EPOCHS+1):
         ckpt_path = f"{CKPT_DIR}/epoch{step}.h5"
         model.save_weights(ckpt_path)
         wandb.save(ckpt_path)
+
+logging.info('Saving final weights...')
+ckpt_path = f"{CKPT_DIR}/final.h5"
+model.save_weights(ckpt_path)
+wandb.save(ckpt_path)
+
+logging.info('Finished Training!')
