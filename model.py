@@ -59,7 +59,9 @@ class CycleGAN(tf.keras.Model):
     # ---------------------------------- LOSSES ---------------------------------- #
     @tf.function
     def disc_loss_A(self, realAscore, fakeA):
-        # Same as gan_loss_A, except fakeA is randomly replaced from a buffer
+        # Same as gan_loss_A, except fakeA is randomly replaced from a buffer and targets are swapped
+        # Discriminator aims to maximise this
+        
         fakeA = self.poolA.query(fakeA)
 
         fakeAscore = self.discA(fakeA)
@@ -69,7 +71,7 @@ class CycleGAN(tf.keras.Model):
     @tf.function
     def disc_loss_B(self, realBscore, fakeB):
         # Same as gan_loss_B, except fakeB is randomly replaced from a buffer
-        fakeB = self.poolB.query(fakeB)
+        # Discriminator aims to maximise this
 
         fakeBscore = self.discB(fakeB)
         return self.gan_loss_fn(tf.zeros_like(realBscore), realBscore) + \

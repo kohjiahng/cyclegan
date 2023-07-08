@@ -108,7 +108,7 @@ def train_one_epoch(step):
             realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
             realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
-            disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB)
+            disc_loss = -model.disc_loss(realAscore, fakeA, realBscore, fakeB) # negate to maximise
 
             gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
             cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
@@ -120,7 +120,7 @@ def train_one_epoch(step):
         disc_opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
         gen_opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
 
-        disc_loss_metric(disc_loss)
+        disc_loss_metric(-disc_loss)
         gan_loss_metric(gan_loss)     
         cycle_loss_metric(cycle_loss)
         loss_metric(loss)
@@ -147,7 +147,7 @@ for step in range(1, NUM_EPOCHS+1):
 
     # ------------------------------ Logging images ------------------------------ #
 
-    if (step - 1) % IMG_LOG_FREQ == 0:
+    if (step - 1) % IMG_LOG_FREQ == 0 or step == NUM_EPOCHS:
         logging.info(f'Logging Images...')
 
         rand_sampleA = sampleA.take(IMG_RANDOM_LOG_NUM) 
