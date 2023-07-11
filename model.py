@@ -34,6 +34,7 @@ class CycleGAN(tf.keras.Model):
             raise NotImplementedError
         
         self.cycle_loss_fn = tf.keras.losses.MeanAbsoluteError()
+        self.identity_loss_fn = tf.keras.losses.MeanAbsoluteError()
 
     # ---------------------------- TRAINING FUNCTIONS ---------------------------- #
     @tf.function
@@ -60,22 +61,22 @@ class CycleGAN(tf.keras.Model):
     @tf.function
     def disc_loss_A(self, realAscore, fakeA):
         # Same as gan_loss_A, except fakeA is randomly replaced from a buffer and targets are swapped
-        # Discriminator aims to maximise this
+        # Discriminator aims to minimise this
         
         fakeA = self.poolA.query(fakeA)
 
         fakeAscore = self.discA(fakeA)
-        return self.gan_loss_fn(tf.zeros_like(realAscore), realAscore) + \
-                    self.gan_loss_fn(tf.ones_like(fakeAscore), fakeAscore)
+        return self.gan_loss_fn(tf.ones_like(realAscore), realAscore) + \
+                    self.gan_loss_fn(tf.zeros_like(fakeAscore), fakeAscore)
 
     @tf.function
     def disc_loss_B(self, realBscore, fakeB):
         # Same as gan_loss_B, except fakeB is randomly replaced from a buffer
-        # Discriminator aims to maximise this
+        # Discriminator aims to minimise this
 
         fakeBscore = self.discB(fakeB)
-        return self.gan_loss_fn(tf.zeros_like(realBscore), realBscore) + \
-                    self.gan_loss_fn(tf.ones_like(fakeBscore), fakeBscore)
+        return self.gan_loss_fn(tf.ones_like(realBscore), realBscore) + \
+                    self.gan_loss_fn(tf.zeros_like(fakeBscore), fakeBscore)
     
     @tf.function
     def disc_loss(self, realAscore, fakeA, realBscore, fakeB):
@@ -102,6 +103,10 @@ class CycleGAN(tf.keras.Model):
         return self.cycle_loss_fn(realA, realA_regen) + \
                     self.cycle_loss_fn(realB, realB_regen)
     
+    @tf.function
+    def identity_loss(self, realA, fakeA, realB, fakeB):
+        return self.identity_loss_fn(realA, fakeA) + \
+                    self.identity_loss_fn(realB, fakeB)
     @tf.function
     def total_loss(self, realA, realAscore, realA_regen, realB, realBscore, realB_regen, fakeA, fakeAscore, fakeB, fakeBscore):
         gan_loss = self.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)

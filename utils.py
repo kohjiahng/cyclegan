@@ -41,11 +41,11 @@ def plot_images_with_scores(images, model):
         ax[0,idx].set_title(f"Score: {realscore[idx].numpy():.3}")
         ax[0,idx].axis('off')
 
-        ax[1,idx].imshow(fake[0,:,:,:])
+        ax[1,idx].imshow(fake[idx,:,:,:])
         ax[1,idx].set_title(f"Score: {fakescore[idx].numpy():.3}")
         ax[1,idx].axis('off')
 
-        ax[2,idx].imshow(regen[0,:,:,:])
+        ax[2,idx].imshow(regen[idx,:,:,:])
         ax[2,idx].set_title(f"Score: {regenscore[idx].numpy():.3}")
         ax[2,idx].axis('off')
 
