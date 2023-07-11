@@ -111,7 +111,9 @@ class CycleGAN(tf.keras.Model):
     def total_loss(self, realA, realAscore, realA_regen, realB, realBscore, realB_regen, fakeA, fakeAscore, fakeB, fakeBscore):
         gan_loss = self.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
         cycle_loss = self.cycle_loss(realA, realA_regen, realB, realB_regen)
-        return gan_loss + LAMBDA * cycle_loss
+        
+        identity_loss = self.identity_loss(realA, fakeA, realB, fakeB)
+        return gan_loss + LAMBDA * cycle_loss + (LAMBDA / 2) * identity_loss
 
     # ---------------------------------- HELPERS --------------------------------- #
     def infer_B(self, X): # A to B

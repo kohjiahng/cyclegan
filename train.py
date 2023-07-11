@@ -99,6 +99,7 @@ def train_one_epoch(step):
     disc_loss_metric = tf.metrics.Mean("disc_loss")
     gan_loss_metric = tf.metrics.Mean("gan_loss")
     cycle_loss_metric = tf.metrics.Mean("cycle_loss")
+    identity_loss_metric = tf.metrics.Mean("identity_loss")
     loss_metric = tf.metrics.Mean("loss")
 
     # --------------------------------- TRAINING --------------------------------- #
@@ -112,7 +113,9 @@ def train_one_epoch(step):
 
             gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
             cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
-            loss = cycle_loss + LAMBDA * gan_loss
+            identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
+
+            loss = cycle_loss + LAMBDA * gan_loss + (LAMBDA/2) * identity_loss
             
         disc_grad = disc_tape.gradient(disc_loss, model.get_disc_trainable_variables())
         gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
@@ -123,6 +126,7 @@ def train_one_epoch(step):
         disc_loss_metric(disc_loss)
         gan_loss_metric(gan_loss)     
         cycle_loss_metric(cycle_loss)
+        identity_loss_metric(identity_loss)
         loss_metric(loss)
 
 
@@ -133,6 +137,7 @@ def train_one_epoch(step):
         'disc_loss': disc_loss_metric.result(),
         'gan_loss': gan_loss_metric.result(),
         'cycle_loss': cycle_loss_metric.result(),
+        'identity_loss': identity_loss_metric.result(),
         'loss': loss_metric.result(),
         'time_per_epoch': time_taken
     }, step=step)
