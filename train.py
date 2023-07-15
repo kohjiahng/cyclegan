@@ -6,6 +6,7 @@ import logging
 from configparser import ConfigParser
 import wandb
 import time
+import atexit
 
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
@@ -55,6 +56,18 @@ wandb.init(
     settings=wandb.Settings(code_dir='.') # Code logging
 )
 
+# ---------------------------------- CLEANUP --------------------------------- #
+def on_exit():
+    logging.info('Saving final weights...')
+    ckpt_path = f"{CKPT_DIR}/final.h5"
+    model.save_weights(ckpt_path)
+    wandb.save(ckpt_path)
+
+    wandb.save(LOG_FILE)
+    logging.info('Finished Training!')
+    
+
+atexit.register(on_exit)
 
 # ---------------------------------------------------------------------------- #
 #                        DATA LOADING AND PREPROCESSING                        #
@@ -77,6 +90,7 @@ sampleB = setB.take(IMG_FIXED_LOG_NUM)
 
 setA = setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
 setA = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
+
 
 # ---------------------------------------------------------------------------- #
 #                                TRAINING SETUP                                #
@@ -155,8 +169,8 @@ for step in range(1, NUM_EPOCHS+1):
     if (step - 1) % IMG_LOG_FREQ == 0 or step == NUM_EPOCHS:
         logging.info(f'Logging Images...')
 
-        rand_sampleA = sampleA.take(IMG_RANDOM_LOG_NUM) 
-        rand_sampleB = sampleB.take(IMG_RANDOM_LOG_NUM)
+        rand_sampleA = setA.take(IMG_RANDOM_LOG_NUM) 
+        rand_sampleB = setB.take(IMG_RANDOM_LOG_NUM)
 
         photo = tf.concat(list(sampleA.concatenate(rand_sampleA)), axis=0)
         monet = tf.concat(list(sampleB.concatenate(rand_sampleB)), axis=0)
@@ -176,10 +190,3 @@ for step in range(1, NUM_EPOCHS+1):
         model.save_weights(ckpt_path)
         wandb.save(ckpt_path)
 
-logging.info('Saving final weights...')
-ckpt_path = f"{CKPT_DIR}/final.h5"
-model.save_weights(ckpt_path)
-wandb.save(ckpt_path)
-
-wandb.save(LOG_FILE)
-logging.info('Finished Training!')
