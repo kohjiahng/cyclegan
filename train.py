@@ -79,7 +79,7 @@ dataset = tfds.load('monet',batch_size=BATCH_SIZE)
 setA, setB = dataset['photo'], dataset['monet']
 
 def preprocess(X):
-    return tf.cast(X['image'], dtype=tf.float32) / 255
+    return tf.cast(X['image'], dtype=tf.float32) / 127.5 - 1 # Scale to [-1,1]
 
 setA = setA.map(preprocess)
 setB = setB.map(preprocess)

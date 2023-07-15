@@ -49,8 +49,7 @@ class Generator(tf.keras.Model):
         assert self.model.output_shape == (None, IMG_RES, IMG_RES, 64)
 
         self.model.add(tf.keras.layers.Conv2D(3, kernel_size=(7,7), strides=1, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.ReLU())
+        self.model.add(tf.keras.layers.Activation(tf.keras.activations.tanh))
 
         assert self.model.output_shape == (None, IMG_RES, IMG_RES, 3)
 
