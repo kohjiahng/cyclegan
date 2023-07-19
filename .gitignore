@@ -4,3 +4,4 @@ train.log
 wandb/
 logs/
 ckpts/
+artifacts/
