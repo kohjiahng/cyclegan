@@ -8,12 +8,15 @@ LAMBDA = config.getint('params', 'LAMBDA')
 PATCH_SIZE = config.getint('params','PATCH_SIZE')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
+DISC_NOISE_STD = config.getfloat('params', 'DISC_NOISE_STD')
 
 class Discriminator(tf.keras.Model):
     def __init__(self):
         super().__init__()
         self.model = tf.keras.Sequential()
         self.model.add(tf.keras.layers.Input((PATCH_SIZE, PATCH_SIZE, 3)))
+
+        self.model.add(tf.keras.layers.GaussianNoise(DISC_NOISE_STD))
 
         self.model.add(tf.keras.layers.Conv2D(64, kernel_size=(4,4), strides=2, padding='same'))
         self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
