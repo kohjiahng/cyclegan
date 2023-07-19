@@ -105,8 +105,8 @@ class CycleGAN(tf.keras.Model):
     
     @tf.function
     def identity_loss(self, realA, fakeA, realB, fakeB):
-        return self.identity_loss_fn(realA, fakeA) + \
-                    self.identity_loss_fn(realB, fakeB)
+        return self.identity_loss_fn(realA, fakeB) + \
+                    self.identity_loss_fn(realB, fakeA)
     @tf.function
     def total_loss(self, realA, realAscore, realA_regen, realB, realBscore, realB_regen, fakeA, fakeAscore, fakeB, fakeBscore):
         gan_loss = self.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
@@ -127,3 +127,10 @@ class CycleGAN(tf.keras.Model):
     
     def get_gen_trainable_variables(self):
         return self.genF.trainable_variables + self.genG.trainable_variables
+    
+    def save_weights_separate(self, dir):
+        self.discA.save_weights(f"{dir}/discA.h5")
+        self.discB.save_weights(f"{dir}/discB.h5")
+        self.genF.save_weights(f"{dir}/genF.h5")
+        self.genG.save_weights(f"{dir}/genG.h5")
+        return self
