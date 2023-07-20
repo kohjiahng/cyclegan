@@ -172,7 +172,7 @@ def train_one_epoch(step):
             cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
             identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
 
-            loss = cycle_loss + LAMBDA * gan_loss + (LAMBDA/2) * identity_loss
+            loss = LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
             
         gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
         gen_opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
