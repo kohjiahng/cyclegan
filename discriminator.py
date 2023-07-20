@@ -36,7 +36,11 @@ class Discriminator(tf.keras.Model):
 
         self.model.add(tf.keras.layers.Conv2D(1, kernel_size=(4,4), strides=1, padding='same'))
 
+        self.model.add(tf.keras.layers.Flatten())
+        self.model.add(tf.keras.layers.Dense(1))
+        
     def call(self, X):
+        N = X.shape[0] # number of images
         patches = tf.image.extract_patches( # Extracts patches from X
             X,
             [1, PATCH_SIZE, PATCH_SIZE, 1],
@@ -45,7 +49,9 @@ class Discriminator(tf.keras.Model):
             padding='VALID'
         )
         patches = tf.reshape(patches, (-1,PATCH_SIZE,PATCH_SIZE,3))
+        output = self.model(patches)
+        output = tf.reshape(output, (N, -1))
 
-        return self.model(patches)
+        return tf.reduce_mean(output, axis = 1)
 
 

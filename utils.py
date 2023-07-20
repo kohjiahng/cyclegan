@@ -31,11 +31,11 @@ class ImagePool:
 def plot_images_with_scores(images, model):
     fig, ax = plt.subplots(3,8,figsize=(images.shape[0]*8,3*8))
 
-    realscore = tf.reduce_mean(model.discA(images), axis=(1,2,3))
+    realscore = model.discA(images)
     fake = model.infer_A(images)
-    fakescore = tf.reduce_mean(model.discB(fake), axis=(1,2,3))
+    fakescore = model.discB(fake)
     regen = model.infer_B(fake)
-    regenscore = tf.reduce_mean(model.discA(regen), axis=(1,2,3))
+    regenscore = model.discA(regen)
     for idx in range(images.shape[0]):
         ax[0,idx].imshow((images[idx,:,:,:]+1)/2)
         ax[0,idx].set_title(f"Score: {realscore[idx].numpy():.3}")

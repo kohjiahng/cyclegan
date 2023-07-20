@@ -57,9 +57,9 @@ logging.getLogger('PIL').setLevel(logging.WARNING)
 
 logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 if GEN_TRAINING_ONLY:
-    logging.info('Only training generator!')
+    logging.info('Only training generator')
 else:
-    logging.info('Training both generator and discriminator!')
+    logging.info('Training both generator and discriminator')
 
 wandb.init(
     project=WANDB_PROJECT_NAME,
