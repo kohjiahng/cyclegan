@@ -3,14 +3,21 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[[source]]
+url = "https://pypi.nvidia.com"
+verify_ssl = true
+name = "pypi.nvidia"
+
 [packages]
 numpy = "*"
-tensorflow = "*"
 python-dotenv = "*"
 tensorflow-datasets = "*"
 configparser = "*"
 wandb = "*"
 matplotlib = "*"
+tensorrt-bindings = {version = "==8.6.1", index = "pypi.nvidia"}
+tensorrt-libs = {version = "==8.6.1", index = "pypi.nvidia"}
+tensorflow = {extras = ["and-cuda"], version = "*"}
 
 [dev-packages]
 ipykernel = "*"
