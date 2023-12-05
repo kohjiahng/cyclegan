@@ -22,7 +22,8 @@ config.read('config.ini')
 
 WANDB_PROJECT_NAME = config.get('settings','WANDB_PROJECT_NAME')
 WANDB_USER = config.get('settings', 'WANDB_USER')
-LOG_FILE = config.get('settings', 'LOG_FILE')
+LOG_FILE_NAME = config.get('settings', 'LOG_FILE_NAME')
+LOG_FILE = f"./logs/{LOG_FILE_NAME}"
 
 IMG_RES = config.getint('params', 'IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
@@ -46,6 +47,14 @@ LOAD_WEIGHTS_DISC = config.getboolean('params', 'LOAD_WEIGHTS_DISC')
 GEN_TRAINING_ONLY = config.getboolean('params', 'GEN_TRAINING_ONLY')
 
 # ------------------------------- LOGGING SETUP ------------------------------ #
+
+# Creating log folder and file if not exist
+if not os.path.isdir('./logs'):
+    os.makedirs('./logs')
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, 'w') as file:
+        pass
+
 logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
                     format = '%(asctime)s:%(levelname)s:%(name)s:%(message)s',
