@@ -120,7 +120,7 @@ sampleA = setA.take(IMG_FIXED_LOG_NUM)
 sampleB = setB.take(IMG_FIXED_LOG_NUM)
 
 setA = setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
-setA = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
+setB = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
 
 
 # ---------------------------------------------------------------------------- #
@@ -228,8 +228,8 @@ for step in range(1, NUM_EPOCHS+1):
         photo = tf.concat(list(sampleA.concatenate(rand_sampleA)), axis=0)
         monet = tf.concat(list(sampleB.concatenate(rand_sampleB)), axis=0)
         
-        photo_fig = plot_images_with_scores(photo, model)
-        monet_fig = plot_images_with_scores(monet, model)
+        photo_fig = plot_images_with_scores(photo, model, which_set='A')
+        monet_fig = plot_images_with_scores(monet, model, which_set='B')
 
         wandb.log({
             'Photo': photo_fig,

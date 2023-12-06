@@ -28,14 +28,25 @@ class ImagePool:
                 return result
 
 # -------------------- Plotting function for image logging ------------------- #
-def plot_images_with_scores(images, model):
+
+def plot_images_with_scores(images, model, which_set):
     fig, ax = plt.subplots(3,8,figsize=(images.shape[0]*8,3*8))
 
-    realscore = model.discA(images)
-    fake = model.infer_A(images)
-    fakescore = model.discB(fake)
-    regen = model.infer_B(fake)
-    regenscore = model.discA(regen)
+    if which_set == 'A':    
+        realscore = model.discA(images)
+        fake = model.infer_B(images)
+        fakescore = model.discB(fake)
+        regen = model.infer_A(fake)
+        regenscore = model.discA(regen)
+    elif which_set == 'B':
+        realscore = model.discB(images)
+        fake = model.infer_A(images)
+        fakescore = model.discA(fake)
+        regen = model.infer_B(fake)
+        regenscore = model.discB(regen)
+    else:
+        raise Exception('which_set must be "A" or "B" in plot_images_with_scores')
+
     for idx in range(images.shape[0]):
         ax[0,idx].imshow((images[idx,:,:,:]+1)/2)
         ax[0,idx].set_title(f"Score: {realscore[idx].numpy():.3}")
