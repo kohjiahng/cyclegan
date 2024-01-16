@@ -173,6 +173,7 @@ def train_one_epoch(step):
             realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
             if GEN_TRAINING_ONLY:
+                disc_loss = 0
                 gan_loss = 0
             else:
                 disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB) 

@@ -75,6 +75,8 @@ class CycleGAN(tf.keras.Model):
         # Same as gan_loss_B, except targets are swapped and fakeB is randomly replaced from a buffer
         # Discriminator aims to minimise this
 
+        fakeB = self.poolB.query(fakeB)
+        
         fakeBscore = self.discB(fakeB)
         return self.gan_loss_fn(tf.ones_like(realBscore), realBscore) + \
                     self.gan_loss_fn(tf.zeros_like(fakeBscore), fakeBscore)
