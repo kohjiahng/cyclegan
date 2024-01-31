@@ -1,6 +1,7 @@
 import random
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import numpy as np
 
 # ------------------ ImagePool class for discriminator loss ------------------ #
 class ImagePool:
@@ -27,6 +28,25 @@ class ImagePool:
                 self.images.append(image)
                 return result
 
+
+# ------------------ Reflection Padding to prevent artifacts ----------------- #
+# https://stackoverflow.com/questions/70382008/what-and-how-to-pretend-these-artifacts-in-training-gan
+# https://stackoverflow.com/questions/50677544/reflection-padding-conv2d
+
+class ReflectionPadding2D(tf.keras.layers.Layer):
+    def __init__(self, padding=(1, 1), **kwargs):
+        self.padding = tuple(padding)
+        self.input_spec = [tf.keras.layers.InputSpec(ndim=4)]
+        super(ReflectionPadding2D, self).__init__(**kwargs)
+
+    def compute_output_shape(self, s):
+        """ If you are using "channels_last" configuration"""
+        return (s[0], s[1] + 2 * self.padding[0], s[2] + 2 * self.padding[1], s[3])
+
+    def call(self, x, mask=None):
+        w_pad,h_pad = self.padding
+        return tf.pad(x, [[0,0], [h_pad,h_pad], [w_pad,w_pad], [0,0] ], 'REFLECT')
+
 # -------------------- Plotting function for image logging ------------------- #
 
 def plot_images_with_scores(images, model, which_set):
@@ -49,15 +69,15 @@ def plot_images_with_scores(images, model, which_set):
 
     for idx in range(images.shape[0]):
         ax[0,idx].imshow((images[idx,:,:,:]+1)/2)
-        ax[0,idx].set_title(f"Score: {realscore[idx].numpy():.3}")
+        ax[0,idx].set_title(f"Score: {np.mean(realscore[idx]):.3}")
         ax[0,idx].axis('off')
 
         ax[1,idx].imshow((fake[idx,:,:,:]+1)/2)
-        ax[1,idx].set_title(f"Score: {fakescore[idx].numpy():.3}")
+        ax[1,idx].set_title(f"Score: {np.mean(fakescore[idx]):.3}")
         ax[1,idx].axis('off')
 
         ax[2,idx].imshow((regen[idx,:,:,:]+1)/2)
-        ax[2,idx].set_title(f"Score: {regenscore[idx].numpy():.3}")
+        ax[2,idx].set_title(f"Score: {np.mean(regenscore[idx]):.3}")
         ax[2,idx].axis('off')
 
     fig.subplots_adjust(wspace=0,hspace=0.1)

@@ -8,6 +8,7 @@ import wandb
 import time
 import atexit
 import os
+from augment import get_data_augmentation
 
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
@@ -109,11 +110,23 @@ atexit.register(on_exit)
 dataset = tfds.load('monet',batch_size=BATCH_SIZE)
 setA, setB = dataset['photo'], dataset['monet']
 
-def preprocess(X):
-    return tf.cast(X['image'], dtype=tf.float32) / 127.5 - 1 # Scale to [-1,1]
+def extract_image(X):
+    return tf.cast(X['image'], dtype=tf.float32)
 
-setA = setA.map(preprocess)
-setB = setB.map(preprocess)
+def scale(X):
+    return X/127.5-1 # Scale to [-1,1]
+
+setA = setA.map(extract_image)
+setB = setB.map(extract_image)
+
+data_augmentation = get_data_augmentation()
+augmented_setA = setA.map(data_augmentation)
+augmented_setB = setB.map(data_augmentation)
+
+setA = setA.map(scale)
+augmented_setA = augmented_setA.map(scale)
+setB = setB.map(scale)
+augmented_setB = augmented_setB.map(scale)
 
 # Sample images to log later
 sampleA = setA.take(IMG_FIXED_LOG_NUM)
@@ -121,6 +134,8 @@ sampleB = setB.take(IMG_FIXED_LOG_NUM)
 
 setA = setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
 setB = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
+augmented_setA = augmented_setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
+augmented_setB = augmented_setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
 
 
 # ---------------------------------------------------------------------------- #
@@ -166,7 +181,7 @@ def train_one_epoch(step):
     loss_metric = tf.metrics.Mean("loss")
 
     # --------------------------------- TRAINING --------------------------------- #
-    for imgA, imgB in zip(setA, setB):
+    for imgA, imgB in zip(augmented_setA, augmented_setB):
         
         with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
             realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
@@ -220,7 +235,7 @@ for step in range(1, NUM_EPOCHS+1):
 
     # ------------------------------ Logging images ------------------------------ #
 
-    if step % IMG_LOG_FREQ == 0 or step == NUM_EPOCHS:
+    if step % IMG_LOG_FREQ == 0 or step == NUM_EPOCHS or step == 1:
         logging.info(f'Logging Images...')
 
         rand_sampleA = setA.take(IMG_RANDOM_LOG_NUM) 

@@ -6,6 +6,7 @@ config.read('config.ini')
 
 LAMBDA = config.getint('params', 'LAMBDA')
 PATCH_SIZE = config.getint('params','PATCH_SIZE')
+IMG_RES = config.getint('params','IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
 DISC_NOISE_STD = config.getfloat('params', 'DISC_NOISE_STD')
@@ -14,9 +15,9 @@ class Discriminator(tf.keras.Model):
     def __init__(self):
         super().__init__()
         self.model = tf.keras.Sequential()
-        self.model.add(tf.keras.layers.Input((PATCH_SIZE, PATCH_SIZE, 3)))
+        self.model.add(tf.keras.layers.Input((IMG_RES, IMG_RES, 3)))
 
-        self.model.add(tf.keras.layers.GaussianNoise(DISC_NOISE_STD))
+        # self.model.add(tf.keras.layers.GaussianNoise(DISC_NOISE_STD))
 
         self.model.add(tf.keras.layers.Conv2D(64, kernel_size=(4,4), strides=2, padding='same'))
         self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
@@ -35,11 +36,12 @@ class Discriminator(tf.keras.Model):
         self.model.add(tf.keras.layers.LeakyReLU(0.2))
 
         self.model.add(tf.keras.layers.Conv2D(1, kernel_size=(4,4), strides=1, padding='same'))
-
-        self.model.add(tf.keras.layers.Flatten())
-        self.model.add(tf.keras.layers.Dense(1))
         
+        # Output is (16,16,1)
+
     def call(self, X):
+        return self.model(X)
+    
         N = X.shape[0] # number of images
         patches = tf.image.extract_patches( # Extracts patches from X
             X,

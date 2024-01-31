@@ -1,6 +1,7 @@
 import tensorflow as tf
 from resblock import ResBlock
 from configparser import ConfigParser
+from utils import ReflectionPadding2D
 
 config = ConfigParser()
 config.read('config.ini')
