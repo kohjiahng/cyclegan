@@ -132,23 +132,23 @@ class CycleGAN(tf.keras.Model):
         return self.genF.trainable_variables + self.genG.trainable_variables
     
     def save_weights_separate(self, dir):
-        self.discA.save_weights(f"{dir}/discA.h5")
-        self.discB.save_weights(f"{dir}/discB.h5")
-        self.genF.save_weights(f"{dir}/genF.h5")
-        self.genG.save_weights(f"{dir}/genG.h5")
+        self.discA.save_weights(f"{dir}/discA.weights.h5")
+        self.discB.save_weights(f"{dir}/discB.weights.h5")
+        self.genF.save_weights(f"{dir}/genF.weights.h5")
+        self.genG.save_weights(f"{dir}/genG.weights.h5")
         return self
     
     def load_disc_weights(self, dir):
         self.discA.build((None, IMG_RES, IMG_RES, 3))
         self.discB.build((None, IMG_RES, IMG_RES, 3))
 
-        self.discA.load_weights(f"{dir}/discA.h5")
-        self.discB.load_weights(f"{dir}/discB.h5")
+        self.discA.load_weights(f"{dir}/discA.weights.h5")
+        self.discB.load_weights(f"{dir}/discB.weights.h5")
         return self
 
     def load_gen_weights(self, dir):
         self.genF.build((None, IMG_RES, IMG_RES, 3))
         self.genG.build((None, IMG_RES, IMG_RES, 3))
 
-        self.genF.load_weights(f"{dir}/genF.h5") 
-        self.genG.load_weights(f"{dir}/genG.h5")
+        self.genF.load_weights(f"{dir}/genF.weights.h5") 
+        self.genG.load_weights(f"{dir}/genG.weights.h5")

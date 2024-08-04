@@ -5,12 +5,12 @@ config = ConfigParser()
 config.read('config.ini')
 
 LAMBDA = config.getint('params', 'LAMBDA')
-PATCH_SIZE = config.getint('params','PATCH_SIZE')
 IMG_RES = config.getint('params','IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
-PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
 DISC_NOISE_STD = config.getfloat('params', 'DISC_NOISE_STD')
 
+# PATCH_SIZE = config.getint('params','PATCH_SIZE')
+# PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
 class Discriminator(tf.keras.Model):
     def __init__(self):
         super().__init__()
@@ -40,7 +40,7 @@ class Discriminator(tf.keras.Model):
         # Output is (16,16,1)
 
     def call(self, X):
-        return self.model(X)
+        return tf.math.reduce_mean(self.model(X),axis=[1,2,3])
     
         N = X.shape[0] # number of images
         patches = tf.image.extract_patches( # Extracts patches from X

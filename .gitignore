@@ -5,3 +5,5 @@ wandb/
 logs/
 ckpts/
 artifacts/
+images/
+images.zip

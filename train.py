@@ -32,6 +32,7 @@ NUM_EPOCHS = config.getint('params', 'NUM_EPOCHS')
 N_RES_BLOCKS = config.getint('params', 'N_RES_BLOCKS')
 DISC_LR = config.getfloat('params', 'DISC_LR')
 GEN_LR = config.getfloat('params', 'GEN_LR')
+LR_DECAY_EPOCH = config.getint('params', 'LR_DECAY_EPOCH')
 GAN_LOSS_FN = config.get('params', 'GAN_LOSS_FN')
 LAMBDA = config.getfloat('params', 'LAMBDA')
 IMG_LOG_FREQ = config.getint('settings', 'IMG_LOG_FREQ')
@@ -160,8 +161,21 @@ if INIT_WEIGHTS_WANDB_ARTIFACT:
         logging.info(f"Loaded discriminator weights!")
 
 # -------------------------------- OPTIMIZERS -------------------------------- #
-disc_opt = tf.optimizers.Adam(DISC_LR)
-gen_opt = tf.optimizers.Adam(GEN_LR)
+class LinearDecaySchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+    # Constant until decay_epoch, then linear to 0 until n_epoch
+    def __init__(self, initial_learning_rate, decay_epoch, n_epoch):
+        self.initial_learning_rate = initial_learning_rate
+        self.decay_epoch = decay_epoch
+        self.n_epoch = n_epoch
+        self.decay = self.initial_learning_rate / (n_epoch - decay_epoch)
+
+    def __call__(self, step):
+        step = tf.cast(step, dtype=tf.float32)
+        lr = self.initial_learning_rate - (step - self.decay_epoch) * self.decay
+        return max(0, min(lr, self.initial_learning_rate))
+
+disc_opt = tf.optimizers.Adam(LinearDecaySchedule(DISC_LR, LR_DECAY_EPOCH, NUM_EPOCHS))
+gen_opt = tf.optimizers.Adam(LinearDecaySchedule(GEN_LR, LR_DECAY_EPOCH, NUM_EPOCHS))
 disc_opt.build(model.get_disc_trainable_variables())
 gen_opt.build(model.get_gen_trainable_variables())
 
@@ -211,7 +225,6 @@ def train_one_epoch(step):
         cycle_loss_metric(cycle_loss)
         identity_loss_metric(identity_loss)
         loss_metric(loss)
-
 
     # ---------------------------------- LOGGING --------------------------------- #
     time_taken = time.perf_counter() - start_time

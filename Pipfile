@@ -18,6 +18,7 @@ matplotlib = "*"
 tensorrt-bindings = {version = "==8.6.1", index = "pypi.nvidia"}
 tensorrt-libs = {version = "==8.6.1", index = "pypi.nvidia"}
 tensorflow = {extras = ["and-cuda"], version = "*"}
+pillow = "*"
 
 [dev-packages]
 ipykernel = "*"
