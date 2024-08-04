@@ -1,8 +1,7 @@
 import tensorflow as tf
-from resblock import ResBlock
+from blocks import ResBlock
 from configparser import ConfigParser
-from utils import ReflectionPadding2D
-
+from blocks import ConvLayerNormRelu, ConvTransposeLayerNormRelu, initializer
 config = ConfigParser()
 config.read('config.ini')
 
@@ -16,19 +15,14 @@ class Generator(tf.keras.Model):
 
         self.model.add(tf.keras.layers.Input((IMG_RES, IMG_RES, 3)))
 
-        self.model.add(tf.keras.layers.Conv2D(64,kernel_size=(7,7),strides=1, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.ReLU())
+        self.model.add(ConvLayerNormRelu(64,kernel_size=(7,7),strides=1))
         assert self.model.output_shape == (None, IMG_RES, IMG_RES, 64)
 
-        self.model.add(tf.keras.layers.Conv2D(128, kernel_size=(3,3),strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.ReLU())
+        self.model.add(ConvLayerNormRelu(128,kernel_size=(3,3),strides=2))
         assert self.model.output_shape == (None, IMG_RES//2, IMG_RES//2, 128)
 
-        self.model.add(tf.keras.layers.Conv2D(256, kernel_size=(3,3),strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.ReLU())
+    
+        self.model.add(ConvLayerNormRelu(256,kernel_size=(3,3),strides=2))
 
         assert self.model.output_shape == (None, IMG_RES//4, IMG_RES//4, 256)
 
@@ -37,19 +31,15 @@ class Generator(tf.keras.Model):
 
         assert self.model.output_shape == (None, IMG_RES//4, IMG_RES//4, 256)
 
-        self.model.add(tf.keras.layers.Conv2DTranspose(128, kernel_size=(3,3), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.ReLU())
+        self.model.add(ConvTransposeLayerNormRelu(128,kernel_size=(3,3),strides=2))
 
         assert self.model.output_shape == (None, IMG_RES//2, IMG_RES//2, 128)
 
-        self.model.add(tf.keras.layers.Conv2DTranspose(64, kernel_size=(3,3), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.ReLU())
+        self.model.add(ConvTransposeLayerNormRelu(64,kernel_size=(3,3),strides=2))
 
         assert self.model.output_shape == (None, IMG_RES, IMG_RES, 64)
 
-        self.model.add(tf.keras.layers.Conv2D(3, kernel_size=(7,7), strides=1, padding='same', activation='tanh'))
+        self.model.add(tf.keras.layers.Conv2D(3, kernel_size=(7,7), strides=1, padding='same', activation='tanh', kernel_initializer=initializer, bias_initializer=initializer))
 
         assert self.model.output_shape == (None, IMG_RES, IMG_RES, 3)
 

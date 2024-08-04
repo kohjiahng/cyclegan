@@ -1,5 +1,6 @@
 import tensorflow as tf
 from configparser import ConfigParser
+from blocks import ConvLayerNormRelu, initializer
 
 config = ConfigParser()
 config.read('config.ini')
@@ -19,23 +20,12 @@ class Discriminator(tf.keras.Model):
 
         # self.model.add(tf.keras.layers.GaussianNoise(DISC_NOISE_STD))
 
-        self.model.add(tf.keras.layers.Conv2D(64, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.LeakyReLU(0.2))
+        self.model.add(ConvLayerNormRelu(64,kernel_size=(4,4),strides=2,leaky=True))
+        self.model.add(ConvLayerNormRelu(128,kernel_size=(4,4),strides=2,leaky=True))
+        self.model.add(ConvLayerNormRelu(256,kernel_size=(4,4),strides=2,leaky=True))
+        self.model.add(ConvLayerNormRelu(512,kernel_size=(4,4),strides=2,leaky=True))
 
-        self.model.add(tf.keras.layers.Conv2D(128, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.LeakyReLU(0.2))
-        
-        self.model.add(tf.keras.layers.Conv2D(256, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.LeakyReLU(0.2))
-
-        self.model.add(tf.keras.layers.Conv2D(512, kernel_size=(4,4), strides=2, padding='same'))
-        self.model.add(tf.keras.layers.GroupNormalization(groups=-1))
-        self.model.add(tf.keras.layers.LeakyReLU(0.2))
-
-        self.model.add(tf.keras.layers.Conv2D(1, kernel_size=(4,4), strides=1, padding='same'))
+        self.model.add(tf.keras.layers.Conv2D(1, kernel_size=(4,4), strides=1, padding='same', activation='sigmoid', kernel_initializer=initializer, bias_initializer=initializer))
         
         # Output is (16,16,1)
 
