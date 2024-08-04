@@ -31,19 +31,3 @@ class Discriminator(tf.keras.Model):
 
     def call(self, X):
         return tf.math.reduce_mean(self.model(X),axis=[1,2,3])
-    
-        N = X.shape[0] # number of images
-        patches = tf.image.extract_patches( # Extracts patches from X
-            X,
-            [1, PATCH_SIZE, PATCH_SIZE, 1],
-            strides=[1,PATCHGAN_STRIDES,PATCHGAN_STRIDES,1], # Strides to avoid OOM
-            rates=[1,1,1,1],
-            padding='VALID'
-        )
-        patches = tf.reshape(patches, (-1,PATCH_SIZE,PATCH_SIZE,3))
-        output = self.model(patches)
-        output = tf.reshape(output, (N, -1))
-
-        return tf.reduce_mean(output, axis = 1)
-
-

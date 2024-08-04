@@ -167,10 +167,12 @@ class LinearDecaySchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
         self.initial_learning_rate = initial_learning_rate
         self.decay_epoch = decay_epoch
         self.n_epoch = n_epoch
-        self.decay = self.initial_learning_rate / (n_epoch - decay_epoch)
+        self.decay = self.initial_learning_rate / max(1,n_epoch - decay_epoch)
 
     def __call__(self, step):
         step = tf.cast(step, dtype=tf.float32)
+        if self.n_epoch < self.decay_epoch:
+            return self.initial_learning_rate
         lr = self.initial_learning_rate - (step - self.decay_epoch) * self.decay
         return max(0, min(lr, self.initial_learning_rate))
 
@@ -211,14 +213,15 @@ def train_one_epoch(step):
             cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
             identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
 
-            loss = LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
+            loss = 0*LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
             
+        # if step % 2 == 0:
+        #     disc_grad = disc_tape.gradient(disc_loss, model.get_disc_trainable_variables())
+        #     disc_opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
+        # else:
         gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
         gen_opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
 
-        if not GEN_TRAINING_ONLY:
-            disc_grad = disc_tape.gradient(disc_loss, model.get_disc_trainable_variables())
-            disc_opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
 
         disc_loss_metric(disc_loss)
         gan_loss_metric(gan_loss)     
