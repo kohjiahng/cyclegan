@@ -92,15 +92,15 @@ wandb.init(
 def on_exit():
     # --------------------------- Saving final weights --------------------------- #
     logging.info('Saving final weights...')
-    final_dir = f"{CKPT_DIR}/final"
-    os.makedirs(final_dir, exist_ok=True)
-    model.save_weights_separate(final_dir)
-
-    wandb.save(final_dir)
+    final_path = f"{CKPT_DIR}/final.pt"
+    torch.save(model.ckpt(), final_path)
 
     artifact = wandb.Artifact(f"ckpt_final", type='model')
-    artifact.add_dir(final_dir)
+
+    artifact.add_file(final_path)
+
     wandb.log_artifact(artifact)
+
 
     # -------------------------------- Saving logs ------------------------------- #
     wandb.save(LOG_FILE)
@@ -108,7 +108,7 @@ def on_exit():
     logging.info('Finished Training!')
 
 
-# atexit.register(on_exit)
+atexit.register(on_exit)
 
 # ---------------------------------------------------------------------------- #
 #                        DATA LOADING AND PREPROCESSING                        #
@@ -132,19 +132,6 @@ fixed_sampleB = torch.stack([monet_dataset[idx] for idx in range(IMG_FIXED_LOG_N
 # ------------------------------ CREATING MODEL ------------------------------ #
 model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS).cuda()
 
-# if INIT_WEIGHTS_WANDB_ARTIFACT: 
-#     logging.info(f"Downloading weight artifact from {INIT_WEIGHTS_WANDB_ARTIFACT}...")
-
-#     artifact = wandb.use_artifact(INIT_WEIGHTS_WANDB_ARTIFACT)
-#     weight_dir = artifact.download()
-
-#     if LOAD_WEIGHTS_GEN:
-#         model.load_gen_weights(weight_dir)
-#         logging.info(f"Loaded generator weights!")
-
-#     if LOAD_WEIGHTS_DISC:
-#         model.load_disc_weights(weight_dir)
-#         logging.info(f"Loaded discriminator weights!")
 
 # -------------------------------- OPTIMIZERS -------------------------------- #
 
@@ -176,34 +163,38 @@ def train_one_epoch(step):
             setB_iterator = iter(setB)
             imgB = next(setB_iterator)
 
-        with torch.autograd.detect_anomaly():
-            disc_opt.zero_grad()
-            gen_opt.zero_grad()
-            imgA = imgA.to('cuda')
-            imgB = imgB.to('cuda')
+        imgA = imgA.to('cuda')
+        imgB = imgB.to('cuda')
+
+        # Train discriminator
+        disc_opt.zero_grad()
+        with torch.no_grad():
             realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
             realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
-            disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB) 
+        disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB) 
+        disc_loss.backward()
+        disc_opt.step()
 
-            gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
-            cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
-            identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
+        # Train generator
+        gen_opt.zero_grad()
+        realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
+        realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
 
-            loss = LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
-    
-            if step % 2 == 0: # Train discriminator
-                disc_loss.backward()
-                disc_opt.step()
-            else:
-                loss.backward()
-                gen_opt.step()
+        gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
+        cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
+        identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
 
-            disc_loss_metric(disc_loss)
-            gan_loss_metric(gan_loss)     
-            cycle_loss_metric(cycle_loss)
-            identity_loss_metric(identity_loss)
-            loss_metric(loss)
+        loss = LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
+
+        loss.backward()
+        gen_opt.step()
+
+        disc_loss_metric(disc_loss.item())
+        gan_loss_metric(gan_loss.item())     
+        cycle_loss_metric(cycle_loss.item())
+        identity_loss_metric(identity_loss.item())
+        loss_metric(loss.item())
 
 
     # ---------------------------------- LOGGING --------------------------------- #
@@ -227,7 +218,6 @@ for step in range(1, NUM_EPOCHS+1):
     train_one_epoch(step)
 
     # ------------------------------ Logging images ------------------------------ #
-    continue
     model.eval()
     if step % IMG_LOG_FREQ == 0 or step == NUM_EPOCHS or step == 1:
         logging.info(f'Logging Images...')
@@ -248,18 +238,15 @@ for step in range(1, NUM_EPOCHS+1):
             'Monet': monet_fig
         })
 
-    # # ---------------------------- Creating checkpoint --------------------------- #
-    # if step % CKPT_FREQ == 0:
-    #     logging.info('Creating checkpoint...')
-    #     ckpt_dir = f"{CKPT_DIR}/epoch{step}"
-    #     os.makedirs(ckpt_dir, exist_ok=True)
+    # ---------------------------- Creating checkpoint --------------------------- #
+    if step % CKPT_FREQ == 0:
+        logging.info('Creating checkpoint...')
+        ckpt_path = f"{CKPT_DIR}/epoch{step}.pt"
+        torch.save(model.ckpt(), ckpt_path)
 
-    #     model.save_weights_separate(ckpt_dir)
-    #     wandb.save(ckpt_dir)
+        artifact = wandb.Artifact(f"ckpt_epoch{step}", type='model')
 
-    #     artifact = wandb.Artifact(f"ckpt_epoch{step}", type='model')
+        artifact.add_file(ckpt_path)
 
-    #     artifact.add_dir(ckpt_dir)
-
-    #     wandb.log_artifact(artifact)
+        wandb.log_artifact(artifact)
 

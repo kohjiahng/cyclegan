@@ -10,7 +10,7 @@ class JPGDataset(Dataset):
     def __init__(self, root_dir):
         super().__init__()
         self.root_dir = Path(root_dir)
-        self.images = list(self.root_dir.glob('*.jpg'))[:30]
+        self.images = list(self.root_dir.glob('*.jpg'))
         if len(self.images) == 0:
             raise Exception(f"No JPG files found in {root_dir}")
     def __len__(self):

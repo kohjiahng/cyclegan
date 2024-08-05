@@ -141,6 +141,14 @@ class CycleGAN():
         self.discB.to('cuda')
         return self
 
+    def ckpt(self):
+        return {
+            'genF_state_dict': self.genF.state_dict(),
+            'genG_state_dict': self.genG.state_dict(),
+            'discA_state_dict': self.discA.state_dict(),
+            'discB_state_dict': self.discB.state_dict(),
+        }
+
     # def save_weights_separate(self, dir):
     #     self.discA.save_weights(f"{dir}/discA.weights.h5")
     #     self.discB.save_weights(f"{dir}/discB.weights.h5")
