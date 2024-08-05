@@ -148,25 +148,10 @@ class CycleGAN():
             'discA_state_dict': self.discA.state_dict(),
             'discB_state_dict': self.discB.state_dict(),
         }
-
-    # def save_weights_separate(self, dir):
-    #     self.discA.save_weights(f"{dir}/discA.weights.h5")
-    #     self.discB.save_weights(f"{dir}/discB.weights.h5")
-    #     self.genF.save_weights(f"{dir}/genF.weights.h5")
-    #     self.genG.save_weights(f"{dir}/genG.weights.h5")
-    #     return self
-    
-    # def load_disc_weights(self, dir):
-    #     self.discA.build((None, IMG_RES, IMG_RES, 3))
-    #     self.discB.build((None, IMG_RES, IMG_RES, 3))
-
-    #     self.discA.load_weights(f"{dir}/discA.weights.h5")
-    #     self.discB.load_weights(f"{dir}/discB.weights.h5")
-    #     return self
-
-    # def load_gen_weights(self, dir):
-    #     self.genF.build((None, IMG_RES, IMG_RES, 3))
-    #     self.genG.build((None, IMG_RES, IMG_RES, 3))
-
-    #     self.genF.load_weights(f"{dir}/genF.weights.h5") 
-    #     self.genG.load_weights(f"{dir}/genG.weights.h5")
+    def modules(self):
+        return self.genF, self.genG, self.discA, self.discB
+    def init_params(self):
+        self.genF(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        self.genG(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        self.discA(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        self.discB(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))

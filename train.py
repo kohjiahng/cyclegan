@@ -6,10 +6,9 @@ import wandb
 import time
 import atexit
 import os
-from augment import get_data_augmentation
 
 from datasets import JPGDataset
-from torch.utils.data import DataLoader, RandomSampler, BatchSampler
+from torch.utils.data import DataLoader
 import torch
 from random import sample
 import argparse
@@ -74,6 +73,7 @@ logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 
 logging.info(f"Num GPUs: {torch.cuda.device_count()}")
+
 if GEN_TRAINING_ONLY:
     logging.info('Only training generator')
 else:
@@ -132,6 +132,8 @@ fixed_sampleB = torch.stack([monet_dataset[idx] for idx in range(IMG_FIXED_LOG_N
 # ------------------------------ CREATING MODEL ------------------------------ #
 model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS).cuda()
 
+model.init_params()
+wandb.watch(model.modules(), log='all')
 
 # -------------------------------- OPTIMIZERS -------------------------------- #
 
@@ -155,13 +157,7 @@ def train_one_epoch(step):
     loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    setB_iterator = iter(setB)
-    for imgA in setA:
-        try:
-            imgB = next(setB_iterator)
-        except StopIteration:
-            setB_iterator = iter(setB)
-            imgB = next(setB_iterator)
+    for imgA, imgB in zip(setA, setB):
 
         imgA = imgA.to('cuda')
         imgB = imgB.to('cuda')
