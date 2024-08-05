@@ -1,50 +1,42 @@
-import tensorflow as tf
 from blocks import ResBlock
 from configparser import ConfigParser
-from blocks import ConvLayerNormRelu, ConvTransposeLayerNormRelu, initializer
+from blocks import ConvInstanceNormRelu, ConvTransposeInstanceNormRelu
+from torch import nn
+import torch
 config = ConfigParser()
 config.read('config.ini')
 
 IMG_RES = config.getint('params','IMG_RES')
-BATCH_SIZE = config.getint('params', 'BATCH_SIZE')
 
-class Generator(tf.keras.Model):
+class Generator(nn.Module):
     def __init__(self, n_resblocks):
         super().__init__()
-        self.model = tf.keras.Sequential()
 
-        self.model.add(tf.keras.layers.Input((IMG_RES, IMG_RES, 3)))
+        self.enc = nn.Sequential(
+            ConvInstanceNormRelu(3,kernel_size=(7,7),stride=1,padding="same"),
+            ConvInstanceNormRelu(64,kernel_size=(3,3),stride=2),
+            ConvInstanceNormRelu(256,kernel_size=(3,3),stride=2),
+        )
+        self.resblocks = nn.Sequential(
+            *(ResBlock(256,3) for _ in range(n_resblocks))
+        )
+        self.dec = nn.Sequential(
+            ConvTransposeInstanceNormRelu(128,kernel_size=(3,3),stride=2),
+            ConvTransposeInstanceNormRelu(64,kernel_size=(3,3),stride=2,output_padding=1),
+            nn.Conv2d(64, 3, kernel_size=(7,7), stride=1,padding="same"),
+            nn.Tanh()
+        )
+        self.model = nn.Sequential(
+            self.enc,
+            self.resblocks,
+            self.dec
+        )
 
-        self.model.add(ConvLayerNormRelu(64,kernel_size=(7,7),strides=1))
-        assert self.model.output_shape == (None, IMG_RES, IMG_RES, 64)
-
-        self.model.add(ConvLayerNormRelu(128,kernel_size=(3,3),strides=2))
-        assert self.model.output_shape == (None, IMG_RES//2, IMG_RES//2, 128)
-
-    
-        self.model.add(ConvLayerNormRelu(256,kernel_size=(3,3),strides=2))
-
-        assert self.model.output_shape == (None, IMG_RES//4, IMG_RES//4, 256)
-
-        for _ in range(n_resblocks):
-            self.model.add(ResBlock(3, 256))
-
-        assert self.model.output_shape == (None, IMG_RES//4, IMG_RES//4, 256)
-
-        self.model.add(ConvTransposeLayerNormRelu(128,kernel_size=(3,3),strides=2))
-
-        assert self.model.output_shape == (None, IMG_RES//2, IMG_RES//2, 128)
-
-        self.model.add(ConvTransposeLayerNormRelu(64,kernel_size=(3,3),strides=2))
-
-        assert self.model.output_shape == (None, IMG_RES, IMG_RES, 64)
-
-        self.model.add(tf.keras.layers.Conv2D(3, kernel_size=(7,7), strides=1, padding='same', activation='tanh', kernel_initializer=initializer, bias_initializer=initializer))
-
-        assert self.model.output_shape == (None, IMG_RES, IMG_RES, 3)
-
-    def call(self, X):
+    def forward(self, X):
         return self.model(X)
 
 if __name__ == '__main__':
     gen = Generator(6)
+    inp = torch.zeros((1, 3, IMG_RES, IMG_RES))
+    out = gen(inp)
+    print(f"Output shape: {out.shape}")
