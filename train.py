@@ -62,6 +62,8 @@ if not os.path.isdir('./logs'):
 if not os.path.exists(LOG_FILE):
     with open(LOG_FILE, 'w') as file:
         pass
+if not os.path.isdir(CKPT_DIR):
+    os.makedirs(CKPT_DIR)
 
 logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
@@ -133,6 +135,11 @@ fixed_sampleB = torch.stack([monet_dataset[idx] for idx in range(IMG_FIXED_LOG_N
 model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS).cuda()
 
 model.init_params()
+
+with open('./logs/gen_architecture.txt', 'w') as f:
+    f.write(model.genF.__repr__())
+with open('./logs/disc_architecture.txt', 'w') as f:
+    f.write(model.discA.__repr__())
 wandb.watch(model.modules(), log='all')
 
 # -------------------------------- OPTIMIZERS -------------------------------- #

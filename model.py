@@ -140,6 +140,9 @@ class CycleGAN():
         self.discA.to('cuda')
         self.discB.to('cuda')
         return self
+    def apply(self,fn):
+        for module in self.modules():
+            module.apply(fn)
 
     def ckpt(self):
         return {

@@ -11,8 +11,6 @@ IMG_RES = config.getint('params','IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 DISC_NOISE_STD = config.getfloat('params', 'DISC_NOISE_STD')
 
-# PATCH_SIZE = config.getint('params','PATCH_SIZE')
-# PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
 class Discriminator(nn.Module):
     def __init__(self):
         super().__init__()
@@ -24,7 +22,6 @@ class Discriminator(nn.Module):
             nn.Conv2d(512,1,kernel_size=(4,4), stride=1),
             nn.Sigmoid()
         )
-        # Output is (16,16,1)
 
     def forward(self, X):
         return torch.mean(self.model(X), dim=(1,2,3))
