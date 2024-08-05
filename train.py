@@ -12,6 +12,7 @@ from datasets import JPGDataset
 from torch.utils.data import DataLoader, RandomSampler, BatchSampler
 import torch
 from random import sample
+import argparse
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
 # ---------------------------------------------------------------------------- #
@@ -22,6 +23,10 @@ from random import sample
 config = ConfigParser({'INIT_WEIGHTS_WANDB_ARTIFACT':""})
 
 config.read('config.ini')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('data_dir')
+args = parser.parse_args()
 
 WANDB_PROJECT_NAME = config.get('settings','WANDB_PROJECT_NAME')
 WANDB_USER = config.get('settings', 'WANDB_USER')
@@ -110,8 +115,8 @@ def on_exit():
 # ---------------------------------------------------------------------------- #
 
 
-photo_dataset = JPGDataset('./data/photo_jpg')
-monet_dataset = JPGDataset('./data/monet_jpg')
+photo_dataset = JPGDataset(f'{args.data_dir}/photo_jpg')
+monet_dataset = JPGDataset(f'{args.data_dir}/monet_jpg')
 
 setA = DataLoader(photo_dataset, batch_size=BATCH_SIZE, shuffle=True)
 setB = DataLoader(monet_dataset, batch_size=BATCH_SIZE, shuffle=True)
