@@ -36,7 +36,6 @@ def channel_last(x):
 def plot_images_with_scores(images, model, which_set):
     model.eval()
     with torch.no_grad():
-        fig, ax = plt.subplots(3,8,figsize=(images.shape[0]*8,3*8))
 
         if which_set == 'A':    
             realscore = model.discA(images)
@@ -57,6 +56,7 @@ def plot_images_with_scores(images, model, which_set):
     fake = channel_last(fake).cpu()
     regen = channel_last(regen).cpu()
 
+    fig, ax = plt.subplots(3,8,figsize=(images.shape[0]*8,3*8))
     for idx in range(images.shape[0]):
         ax[0,idx].imshow((images[idx,:,:,:]+1)/2)
         ax[0,idx].set_title(f"Score: {realscore[idx]:.3}")

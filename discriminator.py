@@ -6,7 +6,6 @@ from blocks import ConvInstanceNormRelu
 config = ConfigParser()
 config.read('config.ini')
 
-LAMBDA = config.getint('params', 'LAMBDA')
 IMG_RES = config.getint('params','IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 DISC_NOISE_STD = config.getfloat('params', 'DISC_NOISE_STD')

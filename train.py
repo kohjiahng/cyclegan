@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 import torch
 from random import sample
 import argparse
+import torchvision.transforms as T
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
 # ---------------------------------------------------------------------------- #
@@ -109,7 +110,6 @@ def on_exit():
 
     logging.info('Finished Training!')
 
-
 atexit.register(on_exit)
 
 # ---------------------------------------------------------------------------- #
@@ -119,9 +119,14 @@ atexit.register(on_exit)
 
 photo_dataset = JPGDataset(f'{args.data_dir}/photo_jpg')
 monet_dataset = JPGDataset(f'{args.data_dir}/monet_jpg')
+augmented_photo_dataset = JPGDataset(f'{args.data_dir}/photo_jpg', augment=True)
+augmented_monet_dataset = JPGDataset(f'{args.data_dir}/monet_jpg', augment=True)
+
 
 setA = DataLoader(photo_dataset, batch_size=BATCH_SIZE, shuffle=True)
 setB = DataLoader(monet_dataset, batch_size=BATCH_SIZE, shuffle=True)
+augmented_setA = DataLoader(augmented_photo_dataset, batch_size=BATCH_SIZE, shuffle=True)
+augmented_setB = DataLoader(augmented_monet_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Sample images to log later
 fixed_sampleA = torch.stack([photo_dataset[idx] for idx in range(IMG_FIXED_LOG_NUM)])
@@ -147,6 +152,15 @@ wandb.watch(model.modules(), log='all')
 disc_opt = torch.optim.Adam(model.get_disc_parameters(), lr=DISC_LR)
 gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR)
 
+# ------------------------------ INITIALIZATION ------------------------------ #
+
+def init_weights(m):
+    if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.InstanceNorm2d)):
+        torch.nn.init.normal_(m.weight, 0.0, 0.02)
+        if m.bias is not None:
+            torch.nn.init.constant_(m.bias, 0.0)
+model.apply(init_weights)
+
 # ---------------------------------------------------------------------------- #
 #                                 TRAINING STEP                                #
 # ---------------------------------------------------------------------------- #
@@ -164,29 +178,29 @@ def train_one_epoch(step):
     loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    for imgA, imgB in zip(setA, setB):
+    for real_A, real_B in zip(augmented_setA, augmented_setB):
 
-        imgA = imgA.to('cuda')
-        imgB = imgB.to('cuda')
+        real_A = real_A.to('cuda')
+        real_B = real_B.to('cuda')
 
         # Train discriminator
         disc_opt.zero_grad()
         with torch.no_grad():
-            realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
-            realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
+            fake_B = model.genF(real_A)
+            fake_A = model.genG(real_B)
 
-        disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB) 
+        disc_loss = model.disc_loss(real_A, fake_A, real_B, fake_B) 
         disc_loss.backward()
         disc_opt.step()
 
         # Train generator
         gen_opt.zero_grad()
-        realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
-        realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
+        fake_B = model.genF(real_A)
+        fake_A = model.genG(real_B)
 
-        gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
-        cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
-        identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
+        gan_loss = model.gan_loss(real_A, fake_A, real_B, fake_B)
+        cycle_loss = model.cycle_loss(real_A, fake_A, real_B, fake_B)
+        identity_loss = model.identity_loss(real_A, real_B)
 
         loss = LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
 
