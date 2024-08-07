@@ -11,6 +11,7 @@ import os
 import torch
 import argparse
 from generator import Generator
+import sys
 
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
@@ -46,7 +47,7 @@ logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
                     format = '%(asctime)s:%(levelname)s:%(name)s:%(message)s',
                     filemode='w')
-
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.info(f"Num GPUs: {torch.cuda.device_count()}")
 
 # ------------------------------- DATA LOADING ------------------------------- #
