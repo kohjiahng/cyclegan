@@ -39,6 +39,8 @@ if not os.path.isdir('./logs'):
 if not os.path.exists(LOG_FILE):
     with open(LOG_FILE, 'w') as file:
         pass
+if not os.path.isdir('./images'):
+    os.makedirs('./images')
 
 logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
