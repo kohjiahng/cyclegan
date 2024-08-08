@@ -1,31 +1,40 @@
-import tensorflow as tf
+from torch import nn
+from configparser import ConfigParser
 
-initializer = tf.keras.initializers.RandomNormal(mean=0.0,stddev=0.02)
-class ResBlock(tf.keras.layers.Layer):
-    def __init__(self, kernel_size = 3, filters = 256):
+config = ConfigParser()
+config.read('config.ini')
+IMG_RES = config.getint('params', 'IMG_RES')
+
+class ResBlock(nn.Module):
+    def __init__(self, filters = 256, kernel_size = 3,padding=1):
         super().__init__()
-        self.conv1 = tf.keras.layers.Conv2D(filters, kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer=initializer, bias_initializer=initializer)
-        self.conv2 = tf.keras.layers.Conv2D(filters, kernel_size=kernel_size, strides=1, padding='same', activation='relu',kernel_initializer=initializer, bias_initializer=initializer)
+        self.block = nn.Sequential(
+            nn.ReflectionPad2d(padding),
+            ConvInstanceNormRelu(filters, kernel_size=kernel_size, stride=1, padding=0),
+            nn.ReflectionPad2d(padding),
+            ConvInstanceNormRelu(filters, kernel_size=kernel_size, stride=1, padding=0),
+        )
+    def forward(self, x):
+        return x + self.block(x)
 
-    def call(self, X):
-        x = self.conv1(X)
-        y = self.conv2(x)
-        return X+y
-
-class ConvLayerNormRelu(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size, strides, leaky=False):
+class ConvInstanceNormRelu(nn.Module):
+    def __init__(self, filters, leaky=False, **kwargs):
         super().__init__()
-        self.conv = tf.keras.layers.Conv2D(filters, kernel_size=kernel_size, strides=strides,padding='same',kernel_initializer=initializer,bias_initializer=initializer)
-        self.layernorm = tf.keras.layers.GroupNormalization(groups=-1)
-        self.relu = tf.keras.layers.LeakyReLU(0.2) if leaky else tf.keras.layers.ReLU()
-    def call(self, X):
-        return self.relu(self.layernorm(self.conv(X)))
+        self.block = nn.Sequential(
+            nn.LazyConv2d(filters, bias=False,**kwargs),
+            nn.LazyInstanceNorm2d(filters),
+            nn.LeakyReLU(0.2) if leaky else nn.ReLU()
+        )
+    def forward(self, X):
+        return self.block(X)
 
-class ConvTransposeLayerNormRelu(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size, strides):
+class ConvTransposeInstanceNormRelu(nn.Module):
+    def __init__(self, filters, **kwargs): 
         super().__init__()
-        self.conv = tf.keras.layers.Conv2DTranspose(filters, kernel_size=kernel_size, strides=strides,padding='same',kernel_initializer=initializer,bias_initializer=initializer)
-        self.layernorm = tf.keras.layers.GroupNormalization(groups=-1)
-        self.relu = tf.keras.layers.ReLU(0.2)
-    def call(self, X):
-        return self.relu(self.layernorm(self.conv(X)))
+        self.block = nn.Sequential(
+            nn.LazyConvTranspose2d(filters,bias=False, **kwargs),
+            nn.LazyInstanceNorm2d(filters),
+            nn.ReLU()
+        )
+    def forward(self, X):
+        return self.block(X)

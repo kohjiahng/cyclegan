@@ -1,33 +1,32 @@
-import tensorflow as tf
+import torch
+from torch import nn
 from configparser import ConfigParser
-from blocks import ConvLayerNormRelu, initializer
+from blocks import ConvInstanceNormRelu
 
 config = ConfigParser()
 config.read('config.ini')
 
-LAMBDA = config.getint('params', 'LAMBDA')
 IMG_RES = config.getint('params','IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 DISC_NOISE_STD = config.getfloat('params', 'DISC_NOISE_STD')
 
-# PATCH_SIZE = config.getint('params','PATCH_SIZE')
-# PATCHGAN_STRIDES = config.getint('params', 'PATCHGAN_STRIDES')
-class Discriminator(tf.keras.Model):
+class Discriminator(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = tf.keras.Sequential()
-        self.model.add(tf.keras.layers.Input((IMG_RES, IMG_RES, 3)))
+        self.model = torch.nn.Sequential(
+            ConvInstanceNormRelu(64,kernel_size=(4,4),stride=2,leaky=True),
+            ConvInstanceNormRelu(128,kernel_size=(4,4),stride=2,leaky=True),
+            ConvInstanceNormRelu(256,kernel_size=(4,4),stride=2,leaky=True),
+            ConvInstanceNormRelu(512,kernel_size=(4,4),stride=2,leaky=True),
+            nn.Conv2d(512,1,kernel_size=(4,4), stride=1),
+            nn.Sigmoid()
+        )
 
-        # self.model.add(tf.keras.layers.GaussianNoise(DISC_NOISE_STD))
+    def forward(self, X):
+        return torch.mean(self.model(X), dim=(1,2,3))
 
-        self.model.add(ConvLayerNormRelu(64,kernel_size=(4,4),strides=2,leaky=True))
-        self.model.add(ConvLayerNormRelu(128,kernel_size=(4,4),strides=2,leaky=True))
-        self.model.add(ConvLayerNormRelu(256,kernel_size=(4,4),strides=2,leaky=True))
-        self.model.add(ConvLayerNormRelu(512,kernel_size=(4,4),strides=2,leaky=True))
-
-        self.model.add(tf.keras.layers.Conv2D(1, kernel_size=(4,4), strides=1, padding='same', activation='sigmoid', kernel_initializer=initializer, bias_initializer=initializer))
-        
-        # Output is (16,16,1)
-
-    def call(self, X):
-        return tf.math.reduce_mean(self.model(X),axis=[1,2,3])
+if __name__ == '__main__':
+    disc = Discriminator()
+    inp = torch.zeros((1, 3, IMG_RES, IMG_RES))
+    out = disc(inp)
+    print(f"Output shape: {out.shape}")

@@ -1,8 +1,10 @@
-import tensorflow as tf
 from utils import ImagePool
 from generator import Generator
 from discriminator import Discriminator
 from configparser import ConfigParser
+import torch
+import itertools
+from torch import nn
 
 config = ConfigParser()
 config.read('config.ini')
@@ -11,12 +13,11 @@ POOL_SIZE = config.getint('params', 'POOL_SIZE')
 LAMBDA = config.getint('params', 'LAMBDA')
 IMG_RES = config.getint('params', 'IMG_RES')
 
-class CycleGAN(tf.keras.Model):
+class CycleGAN():
     def __init__(self, gan_loss_fn = 'bce', n_resblocks=6):
         '''
         gan_loss_fn: either 'mse' or 'bce'
         '''
-        super().__init__()
 
         self.genF = Generator(n_resblocks)
         self.discB = Discriminator()
@@ -24,99 +25,67 @@ class CycleGAN(tf.keras.Model):
         self.genG = Generator(n_resblocks)
         self.discA = Discriminator()
 
-        self.poolA = ImagePool(POOL_SIZE)
-        self.poolB = ImagePool(POOL_SIZE)
+        self.pool_A = ImagePool(POOL_SIZE)
+        self.pool_B = ImagePool(POOL_SIZE)
 
         if gan_loss_fn == 'mse':
-            self.gan_loss_fn = tf.keras.losses.MeanSquaredError() 
+            self.gan_loss_fn = nn.MSELoss()
         elif gan_loss_fn == 'bce':
-            self.gan_loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+            self.gan_loss_fn = nn.BCELoss()
         else:
             raise NotImplementedError
         
-        self.cycle_loss_fn = tf.keras.losses.MeanAbsoluteError()
-        self.identity_loss_fn = tf.keras.losses.MeanAbsoluteError()
+        self.cycle_loss_fn = nn.L1Loss()
+        self.identity_loss_fn = nn.L1Loss()
 
-    # ---------------------------- TRAINING FUNCTIONS ---------------------------- #
-    @tf.function
-    def forward_A(self, X):
-        realA = X
-        realAscore = self.discA(X)
-        fakeB = self.genF(X)
-        fakeBscore = self.discB(fakeB)
-        realA_regen = self.genG(fakeB)
+    def disc_loss(self, real_A, fake_A, real_B, fake_B):
+        fake_A = self.pool_A.query(fake_A)
+        fake_B = self.pool_B.query(fake_B)
 
-        return realA, realAscore, fakeB, fakeBscore, realA_regen
+        real_A_score = self.discA(real_A)
+        fake_A_score = self.discA(fake_A)
+        loss_A = self.gan_loss_fn(
+            torch.concat((real_A_score,fake_A_score)),
+            torch.concat((torch.ones_like(real_A_score), torch.zeros_like(fake_A_score)))
+        )
 
-    @tf.function
-    def forward_B(self, X):
-        realB = X
-        realBscore = self.discB(X)
-        fakeA = self.genG(X)
-        fakeAscore = self.discA(fakeA)
-        realB_regen = self.genF(fakeA)
+        real_B_score = self.discB(real_B)
+        fake_B_score = self.discB(fake_B)
+        loss_B = self.gan_loss_fn(
+            torch.concat((real_B_score,fake_B_score)),
+            torch.concat((torch.ones_like(real_B_score), torch.zeros_like(fake_B_score)))
+        )
 
-        return realB, realBscore, fakeA, fakeAscore, realB_regen 
-
-    # ---------------------------------- LOSSES ---------------------------------- #
-    @tf.function
-    def disc_loss_A(self, realAscore, fakeA):
-        # Same as gan_loss_A, except targets are swapped and fakeA is randomly replaced from a buffer and targets are swapped
-        # Discriminator aims to minimise this
-        
-        fakeA = self.poolA.query(fakeA)
-
-        fakeAscore = self.discA(fakeA)
-        return self.gan_loss_fn(tf.ones_like(realAscore), realAscore) + \
-                    self.gan_loss_fn(tf.zeros_like(fakeAscore), fakeAscore)
-
-    @tf.function
-    def disc_loss_B(self, realBscore, fakeB):
-        # Same as gan_loss_B, except targets are swapped and fakeB is randomly replaced from a buffer
-        # Discriminator aims to minimise this
-
-        fakeB = self.poolB.query(fakeB)
-        
-        fakeBscore = self.discB(fakeB)
-        return self.gan_loss_fn(tf.ones_like(realBscore), realBscore) + \
-                    self.gan_loss_fn(tf.zeros_like(fakeBscore), fakeBscore)
+        return (loss_A + loss_B) / 2
     
-    @tf.function
-    def disc_loss(self, realAscore, fakeA, realBscore, fakeB):
-        return self.disc_loss_A(realAscore, fakeA) + self.disc_loss_B(realBscore, fakeB)
+    def gan_loss(self, real_A, fake_A, real_B, fake_B):
+        real_A_score = self.discA(real_A)
+        fake_A_score = self.discA(fake_A)
+        loss_A = self.gan_loss_fn(
+            torch.concat((real_A_score,fake_A_score)),
+            torch.concat((torch.zeros_like(real_A_score), torch.ones_like(fake_A_score)))
+        )
 
+        real_B_score = self.discB(real_B)
+        fake_B_score = self.discB(fake_B)
+        loss_B = self.gan_loss_fn(
+            torch.concat((real_B_score,fake_B_score)),
+            torch.concat((torch.zeros_like(real_B_score), torch.ones_like(fake_B_score)))
+        )
 
-    @tf.function
-    def gan_loss_A(self, realAscore, fakeAscore):
-        return self.gan_loss_fn(tf.zeros_like(realAscore), realAscore) + \
-                    self.gan_loss_fn(tf.ones_like(fakeAscore), fakeAscore)
+        return (loss_A + loss_B) / 2
+ 
+    def cycle_loss(self, real_A, fake_A, real_B, fake_B):
+        regen_A = self.genG(fake_B)
+        regen_B = self.genF(fake_A)
 
-    @tf.function
-    def gan_loss_B(self, realBscore, fakeBscore):
-        return self.gan_loss_fn(tf.zeros_like(realBscore), realBscore) + \
-                    self.gan_loss_fn(tf.ones_like(fakeBscore), fakeBscore)
+        return (self.cycle_loss_fn(real_A, regen_A) + self.cycle_loss_fn(real_B, regen_B)) / 2
 
-    @tf.function
-    def gan_loss(self, realAscore, fakeAscore, realBscore, fakeBscore):
-        return self.gan_loss_A(realAscore, fakeAscore) + self.gan_loss_B(realBscore, fakeBscore)
+    def identity_loss(self, real_A, real_B):
+        idt_A = self.genG(real_A)
+        idt_B = self.genF(real_B)
 
-
-    @tf.function
-    def cycle_loss(self, realA, realA_regen, realB, realB_regen):
-        return self.cycle_loss_fn(realA, realA_regen) + \
-                    self.cycle_loss_fn(realB, realB_regen)
-    
-    @tf.function
-    def identity_loss(self, realA, fakeA, realB, fakeB):
-        return self.identity_loss_fn(realA, fakeB) + \
-                    self.identity_loss_fn(realB, fakeA)
-    @tf.function
-    def total_loss(self, realA, realAscore, realA_regen, realB, realBscore, realB_regen, fakeA, fakeAscore, fakeB, fakeBscore):
-        gan_loss = self.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
-        cycle_loss = self.cycle_loss(realA, realA_regen, realB, realB_regen)
-        
-        identity_loss = self.identity_loss(realA, fakeA, realB, fakeB)
-        return gan_loss + LAMBDA * cycle_loss + (LAMBDA / 2) * identity_loss
+        return (self.identity_loss_fn(real_A, idt_A) + self.identity_loss_fn(real_B, idt_B)) / 2
 
     # ---------------------------------- HELPERS --------------------------------- #
     def infer_B(self, X): # A to B
@@ -125,30 +94,45 @@ class CycleGAN(tf.keras.Model):
     def infer_A(self, X): # B to A
         return self.genG(X)
     
-    def get_disc_trainable_variables(self):
-        return self.discA.trainable_variables + self.discB.trainable_variables
+    def get_disc_parameters(self):
+        return itertools.chain(self.discA.parameters(), self.discB.parameters())
     
-    def get_gen_trainable_variables(self):
-        return self.genF.trainable_variables + self.genG.trainable_variables
+    def get_gen_parameters(self):
+        return itertools.chain(self.genF.parameters(), self.genG.parameters())
+
+    def eval(self):
+        self.genF.eval()
+        self.genG.eval()
+        self.discA.eval()
+        self.discB.eval()
+
+    def train(self):
+        self.genF.train()
+        self.genG.train()
+        self.discA.train()
+        self.discB.train()
     
-    def save_weights_separate(self, dir):
-        self.discA.save_weights(f"{dir}/discA.weights.h5")
-        self.discB.save_weights(f"{dir}/discB.weights.h5")
-        self.genF.save_weights(f"{dir}/genF.weights.h5")
-        self.genG.save_weights(f"{dir}/genG.weights.h5")
+    def cuda(self):
+        self.genF.to('cuda')
+        self.genG.to('cuda')
+        self.discA.to('cuda')
+        self.discB.to('cuda')
         return self
-    
-    def load_disc_weights(self, dir):
-        self.discA.build((None, IMG_RES, IMG_RES, 3))
-        self.discB.build((None, IMG_RES, IMG_RES, 3))
+    def apply(self,fn):
+        for module in self.modules():
+            module.apply(fn)
 
-        self.discA.load_weights(f"{dir}/discA.weights.h5")
-        self.discB.load_weights(f"{dir}/discB.weights.h5")
-        return self
-
-    def load_gen_weights(self, dir):
-        self.genF.build((None, IMG_RES, IMG_RES, 3))
-        self.genG.build((None, IMG_RES, IMG_RES, 3))
-
-        self.genF.load_weights(f"{dir}/genF.weights.h5") 
-        self.genG.load_weights(f"{dir}/genG.weights.h5")
+    def ckpt(self):
+        return {
+            'genF_state_dict': self.genF.state_dict(),
+            'genG_state_dict': self.genG.state_dict(),
+            'discA_state_dict': self.discA.state_dict(),
+            'discB_state_dict': self.discB.state_dict(),
+        }
+    def modules(self):
+        return self.genF, self.genG, self.discA, self.discB
+    def init_params(self):
+        self.genF(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        self.genG(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        self.discA(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        self.discB(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))

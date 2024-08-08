@@ -1,15 +1,18 @@
-import tensorflow as tf
-import tensorflow_datasets as tfds
 from model import CycleGAN
-from utils import plot_images_with_scores, infer_type
+from utils import plot_images_with_scores, infer_type, Mean
 import logging
 from configparser import ConfigParser
 import wandb
 import time
 import atexit
 import os
-from augment import get_data_augmentation
 
+from datasets import JPGDataset
+from torch.utils.data import DataLoader
+import torch
+from random import sample
+import argparse
+import torchvision.transforms as T
 # ---------------------------------------------------------------------------- #
 #                                     SETUP                                    #
 # ---------------------------------------------------------------------------- #
@@ -20,6 +23,10 @@ from augment import get_data_augmentation
 config = ConfigParser({'INIT_WEIGHTS_WANDB_ARTIFACT':""})
 
 config.read('config.ini')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('data_dir')
+args = parser.parse_args()
 
 WANDB_PROJECT_NAME = config.get('settings','WANDB_PROJECT_NAME')
 WANDB_USER = config.get('settings', 'WANDB_USER')
@@ -56,6 +63,8 @@ if not os.path.isdir('./logs'):
 if not os.path.exists(LOG_FILE):
     with open(LOG_FILE, 'w') as file:
         pass
+if not os.path.isdir(CKPT_DIR):
+    os.makedirs(CKPT_DIR)
 
 logging.basicConfig(filename=LOG_FILE,
                     level=logging.DEBUG,
@@ -66,7 +75,8 @@ logging.basicConfig(filename=LOG_FILE,
 logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 
-logging.info(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}")
+logging.info(f"Num GPUs: {torch.cuda.device_count()}")
+
 if GEN_TRAINING_ONLY:
     logging.info('Only training generator')
 else:
@@ -85,21 +95,20 @@ wandb.init(
 def on_exit():
     # --------------------------- Saving final weights --------------------------- #
     logging.info('Saving final weights...')
-    final_dir = f"{CKPT_DIR}/final"
-    os.makedirs(final_dir, exist_ok=True)
-    model.save_weights_separate(final_dir)
-
-    wandb.save(final_dir)
+    final_path = f"{CKPT_DIR}/final.pt"
+    torch.save(model.ckpt(), final_path)
 
     artifact = wandb.Artifact(f"ckpt_final", type='model')
-    artifact.add_dir(final_dir)
+
+    artifact.add_file(final_path)
+
     wandb.log_artifact(artifact)
+
 
     # -------------------------------- Saving logs ------------------------------- #
     wandb.save(LOG_FILE)
 
     logging.info('Finished Training!')
-
 
 atexit.register(on_exit)
 
@@ -108,78 +117,49 @@ atexit.register(on_exit)
 # ---------------------------------------------------------------------------- #
 
 
-dataset = tfds.load('monet',batch_size=BATCH_SIZE)
-setA, setB = dataset['photo'], dataset['monet']
+photo_dataset = JPGDataset(f'{args.data_dir}/photo_jpg')
+monet_dataset = JPGDataset(f'{args.data_dir}/monet_jpg')
+augmented_photo_dataset = JPGDataset(f'{args.data_dir}/photo_jpg', augment=True)
+augmented_monet_dataset = JPGDataset(f'{args.data_dir}/monet_jpg', augment=True)
 
-def extract_image(X):
-    return tf.cast(X['image'], dtype=tf.float32)
 
-def scale(X):
-    return X/127.5-1 # Scale to [-1,1]
-
-setA = setA.map(extract_image)
-setB = setB.map(extract_image)
-
-data_augmentation = get_data_augmentation()
-augmented_setA = setA.map(data_augmentation)
-augmented_setB = setB.map(data_augmentation)
-
-setA = setA.map(scale)
-augmented_setA = augmented_setA.map(scale)
-setB = setB.map(scale)
-augmented_setB = augmented_setB.map(scale)
+setA = DataLoader(photo_dataset, batch_size=BATCH_SIZE, shuffle=True)
+setB = DataLoader(monet_dataset, batch_size=BATCH_SIZE, shuffle=True)
+augmented_setA = DataLoader(augmented_photo_dataset, batch_size=BATCH_SIZE, shuffle=True)
+augmented_setB = DataLoader(augmented_monet_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Sample images to log later
-sampleA = setA.take(IMG_FIXED_LOG_NUM)
-sampleB = setB.take(IMG_FIXED_LOG_NUM)
-
-setA = setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
-setB = setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
-augmented_setA = augmented_setA.shuffle(500,seed=0,reshuffle_each_iteration=True)
-augmented_setB = augmented_setB.shuffle(500,seed=0,reshuffle_each_iteration=True)
-
+fixed_sampleA = torch.stack([photo_dataset[idx] for idx in range(IMG_FIXED_LOG_NUM)])
+fixed_sampleB = torch.stack([monet_dataset[idx] for idx in range(IMG_FIXED_LOG_NUM)])
 
 # ---------------------------------------------------------------------------- #
 #                                TRAINING SETUP                                #
 # ---------------------------------------------------------------------------- #
 
 # ------------------------------ CREATING MODEL ------------------------------ #
-model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS)
+model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS).cuda()
 
-if INIT_WEIGHTS_WANDB_ARTIFACT: 
-    logging.info(f"Downloading weight artifact from {INIT_WEIGHTS_WANDB_ARTIFACT}...")
+model.init_params()
 
-    artifact = wandb.use_artifact(INIT_WEIGHTS_WANDB_ARTIFACT)
-    weight_dir = artifact.download()
-
-    if LOAD_WEIGHTS_GEN:
-        model.load_gen_weights(weight_dir)
-        logging.info(f"Loaded generator weights!")
-
-    if LOAD_WEIGHTS_DISC:
-        model.load_disc_weights(weight_dir)
-        logging.info(f"Loaded discriminator weights!")
+with open('./logs/gen_architecture.txt', 'w') as f:
+    f.write(model.genF.__repr__())
+with open('./logs/disc_architecture.txt', 'w') as f:
+    f.write(model.discA.__repr__())
+wandb.watch(model.modules(), log='all')
 
 # -------------------------------- OPTIMIZERS -------------------------------- #
-class LinearDecaySchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    # Constant until decay_epoch, then linear to 0 until n_epoch
-    def __init__(self, initial_learning_rate, decay_epoch, n_epoch):
-        self.initial_learning_rate = initial_learning_rate
-        self.decay_epoch = decay_epoch
-        self.n_epoch = n_epoch
-        self.decay = self.initial_learning_rate / max(1,n_epoch - decay_epoch)
 
-    def __call__(self, step):
-        step = tf.cast(step, dtype=tf.float32)
-        if self.n_epoch < self.decay_epoch:
-            return self.initial_learning_rate
-        lr = self.initial_learning_rate - (step - self.decay_epoch) * self.decay
-        return max(0, min(lr, self.initial_learning_rate))
+disc_opt = torch.optim.Adam(model.get_disc_parameters(), lr=DISC_LR, betas=(0.5,0.999))
+gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR, betas=(0.5,0.999))
 
-disc_opt = tf.optimizers.Adam(LinearDecaySchedule(DISC_LR, LR_DECAY_EPOCH, NUM_EPOCHS))
-gen_opt = tf.optimizers.Adam(LinearDecaySchedule(GEN_LR, LR_DECAY_EPOCH, NUM_EPOCHS))
-disc_opt.build(model.get_disc_trainable_variables())
-gen_opt.build(model.get_gen_trainable_variables())
+# ------------------------------ INITIALIZATION ------------------------------ #
+
+def init_weights(m):
+    if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.InstanceNorm2d)):
+        torch.nn.init.normal_(m.weight, 0.0, 0.02)
+        if m.bias is not None:
+            torch.nn.init.constant_(m.bias, 0.0)
+model.apply(init_weights)
 
 # ---------------------------------------------------------------------------- #
 #                                 TRAINING STEP                                #
@@ -187,47 +167,58 @@ gen_opt.build(model.get_gen_trainable_variables())
 
 def train_one_epoch(step):
     logging.info(f'Training Epoch {step}...')
+    model.train()
 
     start_time = time.perf_counter()
 
-    disc_loss_metric = tf.metrics.Mean("disc_loss")
-    gan_loss_metric = tf.metrics.Mean("gan_loss")
-    cycle_loss_metric = tf.metrics.Mean("cycle_loss")
-    identity_loss_metric = tf.metrics.Mean("identity_loss")
-    loss_metric = tf.metrics.Mean("loss")
+    disc_loss_metric = Mean()
+    gan_loss_metric = Mean()
+    cycle_loss_metric = Mean()
+    identity_loss_metric = Mean()
+    loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    for imgA, imgB in zip(augmented_setA, augmented_setB):
-        
-        with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
-            realA, realAscore, fakeB, fakeBscore, realA_regen = model.forward_A(imgA)
-            realB, realBscore, fakeA, fakeAscore, realB_regen = model.forward_B(imgB)
+    setB_iter = iter(augmented_setB)
+    for real_A in augmented_setA:
+        try:
+            real_B = next(setB_iter)
+        except StopIteration:
+            setB_iter = iter(augmented_setB)
+            real_B = next(setB_iter)
 
-            if GEN_TRAINING_ONLY:
-                disc_loss = 0
-                gan_loss = 0
-            else:
-                disc_loss = model.disc_loss(realAscore, fakeA, realBscore, fakeB) 
-                gan_loss = model.gan_loss(realAscore, fakeAscore, realBscore, fakeBscore)
+        real_A = real_A.to('cuda')
+        real_B = real_B.to('cuda')
 
-            cycle_loss = model.cycle_loss(realA, realA_regen, realB, realB_regen)
-            identity_loss = model.identity_loss(realA, fakeA, realB, fakeB)
+        # Train discriminator
+        disc_opt.zero_grad()
+        with torch.no_grad():
+            fake_B = model.genF(real_A)
+            fake_A = model.genG(real_B)
 
-            loss = 0*LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
-            
-        # if step % 2 == 0:
-        #     disc_grad = disc_tape.gradient(disc_loss, model.get_disc_trainable_variables())
-        #     disc_opt.apply_gradients(zip(disc_grad, model.get_disc_trainable_variables()))
-        # else:
-        gen_grad = gen_tape.gradient(loss, model.get_gen_trainable_variables())
-        gen_opt.apply_gradients(zip(gen_grad, model.get_gen_trainable_variables()))
+        disc_loss = model.disc_loss(real_A, fake_A, real_B, fake_B) 
+        disc_loss.backward()
+        disc_opt.step()
 
+        # Train generator
+        gen_opt.zero_grad()
+        fake_B = model.genF(real_A)
+        fake_A = model.genG(real_B)
 
-        disc_loss_metric(disc_loss)
-        gan_loss_metric(gan_loss)     
-        cycle_loss_metric(cycle_loss)
-        identity_loss_metric(identity_loss)
-        loss_metric(loss)
+        gan_loss = model.gan_loss(real_A, fake_A, real_B, fake_B)
+        cycle_loss = model.cycle_loss(real_A, fake_A, real_B, fake_B)
+        identity_loss = model.identity_loss(real_A, real_B)
+
+        loss = LAMBDA * cycle_loss + (LAMBDA/2) * identity_loss + gan_loss 
+
+        loss.backward()
+        gen_opt.step()
+
+        disc_loss_metric(disc_loss.item())
+        gan_loss_metric(gan_loss.item())     
+        cycle_loss_metric(cycle_loss.item())
+        identity_loss_metric(identity_loss.item())
+        loss_metric(loss.item())
+
 
     # ---------------------------------- LOGGING --------------------------------- #
     time_taken = time.perf_counter() - start_time
@@ -250,15 +241,17 @@ for step in range(1, NUM_EPOCHS+1):
     train_one_epoch(step)
 
     # ------------------------------ Logging images ------------------------------ #
-
+    model.eval()
     if step % IMG_LOG_FREQ == 0 or step == NUM_EPOCHS or step == 1:
         logging.info(f'Logging Images...')
+        
+        rand_sampleA_idx = sample(list(range(len(photo_dataset))), IMG_RANDOM_LOG_NUM)
+        rand_sampleB_idx = sample(list(range(len(monet_dataset))), IMG_RANDOM_LOG_NUM)
+        rand_sampleA = torch.stack([photo_dataset[idx] for idx in rand_sampleA_idx])
+        rand_sampleB = torch.stack([monet_dataset[idx] for idx in rand_sampleB_idx])
 
-        rand_sampleA = setA.take(IMG_RANDOM_LOG_NUM) 
-        rand_sampleB = setB.take(IMG_RANDOM_LOG_NUM)
-
-        photo = tf.concat(list(sampleA.concatenate(rand_sampleA)), axis=0)
-        monet = tf.concat(list(sampleB.concatenate(rand_sampleB)), axis=0)
+        photo = torch.concat([fixed_sampleA,rand_sampleA], dim=0).to('cuda')
+        monet = torch.concat([fixed_sampleB,rand_sampleB], dim=0).to('cuda')
         
         photo_fig = plot_images_with_scores(photo, model, which_set='A')
         monet_fig = plot_images_with_scores(monet, model, which_set='B')
@@ -271,15 +264,12 @@ for step in range(1, NUM_EPOCHS+1):
     # ---------------------------- Creating checkpoint --------------------------- #
     if step % CKPT_FREQ == 0:
         logging.info('Creating checkpoint...')
-        ckpt_dir = f"{CKPT_DIR}/epoch{step}"
-        os.makedirs(ckpt_dir, exist_ok=True)
-
-        model.save_weights_separate(ckpt_dir)
-        wandb.save(ckpt_dir)
+        ckpt_path = f"{CKPT_DIR}/epoch{step}.pt"
+        torch.save(model.ckpt(), ckpt_path)
 
         artifact = wandb.Artifact(f"ckpt_epoch{step}", type='model')
 
-        artifact.add_dir(ckpt_dir)
+        artifact.add_file(ckpt_path)
 
         wandb.log_artifact(artifact)
 

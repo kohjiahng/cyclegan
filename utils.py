@@ -1,8 +1,6 @@
 import random
 import matplotlib.pyplot as plt
-import tensorflow as tf
-import numpy as np
-
+import torch
 # ------------------ ImagePool class for discriminator loss ------------------ #
 class ImagePool:
     def __init__(self, pool_size):
@@ -28,56 +26,48 @@ class ImagePool:
                 self.images.append(image)
                 return result
 
-
-# ------------------ Reflection Padding to prevent artifacts ----------------- #
-# https://stackoverflow.com/questions/70382008/what-and-how-to-pretend-these-artifacts-in-training-gan
-# https://stackoverflow.com/questions/50677544/reflection-padding-conv2d
-
-class ReflectionPadding2D(tf.keras.layers.Layer):
-    def __init__(self, padding=(1, 1), **kwargs):
-        self.padding = tuple(padding)
-        self.input_spec = [tf.keras.layers.InputSpec(ndim=4)]
-        super(ReflectionPadding2D, self).__init__(**kwargs)
-
-    def compute_output_shape(self, s):
-        """ If you are using "channels_last" configuration"""
-        return (s[0], s[1] + 2 * self.padding[0], s[2] + 2 * self.padding[1], s[3])
-
-    def call(self, x, mask=None):
-        w_pad,h_pad = self.padding
-        return tf.pad(x, [[0,0], [h_pad,h_pad], [w_pad,w_pad], [0,0] ], 'REFLECT')
+def channel_first(x):
+    return torch.permute(x, (0,3,1,2))
+def channel_last(x):
+    return torch.permute(x, (0,2,3,1))
 
 # -------------------- Plotting function for image logging ------------------- #
 
 def plot_images_with_scores(images, model, which_set):
+    model.eval()
+    with torch.no_grad():
+
+        if which_set == 'A':    
+            realscore = model.discA(images)
+            fake = model.infer_B(images)
+            fakescore = model.discB(fake)
+            regen = model.infer_A(fake)
+            regenscore = model.discA(regen)
+        elif which_set == 'B':
+            realscore = model.discB(images)
+            fake = model.infer_A(images)
+            fakescore = model.discA(fake)
+            regen = model.infer_B(fake)
+            regenscore = model.discB(regen)
+        else:
+            raise Exception('which_set must be "A" or "B" in plot_images_with_scores')
+
+    images = channel_last(images).cpu()
+    fake = channel_last(fake).cpu()
+    regen = channel_last(regen).cpu()
+
     fig, ax = plt.subplots(3,8,figsize=(images.shape[0]*8,3*8))
-
-    if which_set == 'A':    
-        realscore = model.discA(images)
-        fake = model.infer_B(images)
-        fakescore = model.discB(fake)
-        regen = model.infer_A(fake)
-        regenscore = model.discA(regen)
-    elif which_set == 'B':
-        realscore = model.discB(images)
-        fake = model.infer_A(images)
-        fakescore = model.discA(fake)
-        regen = model.infer_B(fake)
-        regenscore = model.discB(regen)
-    else:
-        raise Exception('which_set must be "A" or "B" in plot_images_with_scores')
-
     for idx in range(images.shape[0]):
         ax[0,idx].imshow((images[idx,:,:,:]+1)/2)
-        ax[0,idx].set_title(f"Score: {np.mean(realscore[idx]):.3}")
+        ax[0,idx].set_title(f"Score: {realscore[idx]:.3}")
         ax[0,idx].axis('off')
 
         ax[1,idx].imshow((fake[idx,:,:,:]+1)/2)
-        ax[1,idx].set_title(f"Score: {np.mean(fakescore[idx]):.3}")
+        ax[1,idx].set_title(f"Score: {fakescore[idx]:.3}")
         ax[1,idx].axis('off')
 
         ax[2,idx].imshow((regen[idx,:,:,:]+1)/2)
-        ax[2,idx].set_title(f"Score: {np.mean(regenscore[idx]):.3}")
+        ax[2,idx].set_title(f"Score: {regenscore[idx]:.3}")
         ax[2,idx].axis('off')
 
     fig.subplots_adjust(wspace=0,hspace=0.1)
@@ -93,3 +83,13 @@ def infer_type(val):
             return float(val)
         except ValueError:
             return val
+
+class Mean():
+    def __init__(self):
+        self.count = 0
+        self.sum = 0
+    def __call__(self,val):
+        self.count += 1
+        self.sum += val
+    def result(self):
+        return self.sum / self.count
