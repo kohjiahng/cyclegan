@@ -149,8 +149,8 @@ wandb.watch(model.modules(), log='all')
 
 # -------------------------------- OPTIMIZERS -------------------------------- #
 
-disc_opt = torch.optim.Adam(model.get_disc_parameters(), lr=DISC_LR)
-gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR)
+disc_opt = torch.optim.Adam(model.get_disc_parameters(), lr=DISC_LR, betas=(0.5,0.999))
+gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR, betas=(0.5,0.999))
 
 # ------------------------------ INITIALIZATION ------------------------------ #
 
@@ -178,7 +178,13 @@ def train_one_epoch(step):
     loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    for real_A, real_B in zip(augmented_setA, augmented_setB):
+    setB_iter = iter(augmented_setB)
+    for real_A in augmented_setA:
+        try:
+            real_B = next(setB_iter)
+        except StopIteration:
+            setB_iter = iter(augmented_setB)
+            real_B = next(setB_iter)
 
         real_A = real_A.to('cuda')
         real_B = real_B.to('cuda')

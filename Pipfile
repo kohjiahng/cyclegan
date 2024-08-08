@@ -11,13 +11,9 @@ name = "pypi.nvidia"
 [packages]
 numpy = "*"
 python-dotenv = "*"
-tensorflow-datasets = "*"
 configparser = "*"
 wandb = "*"
 matplotlib = "*"
-tensorrt-bindings = {version = "==8.6.1", index = "pypi.nvidia"}
-tensorrt-libs = {version = "==8.6.1", index = "pypi.nvidia"}
-tensorflow = {extras = ["and-cuda"], version = "*"}
 pillow = "*"
 
 [dev-packages]
