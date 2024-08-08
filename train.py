@@ -154,12 +154,12 @@ gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR, betas=(0.5,0.9
 
 # ------------------------------ INITIALIZATION ------------------------------ #
 
-def init_weights(m):
-    if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.InstanceNorm2d)):
-        torch.nn.init.normal_(m.weight, 0.0, 0.02)
-        if m.bias is not None:
-            torch.nn.init.constant_(m.bias, 0.0)
-model.apply(init_weights)
+# def init_weights(m):
+#     if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.InstanceNorm2d)):
+#         torch.nn.init.normal_(m.weight, 0.0, 0.02)
+#         if m.bias is not None:
+#             torch.nn.init.constant_(m.bias, 0.0)
+# model.apply(init_weights)
 
 # ---------------------------------------------------------------------------- #
 #                                 TRAINING STEP                                #
