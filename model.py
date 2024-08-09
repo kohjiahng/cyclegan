@@ -1,5 +1,5 @@
 from utils import ImagePool
-from generator import Generator
+from generator import ResNetGenerator, UNetGenerator
 from discriminator import Discriminator
 from configparser import ConfigParser
 import torch
@@ -14,16 +14,20 @@ LAMBDA = config.getint('params', 'LAMBDA')
 IMG_RES = config.getint('params', 'IMG_RES')
 
 class CycleGAN():
-    def __init__(self, gan_loss_fn = 'bce', n_resblocks=6):
+    def __init__(self, gan_loss_fn = 'bce', generator = 'unet', n_resblocks=6):
         '''
         gan_loss_fn: either 'mse' or 'bce'
         '''
+        if generator == 'unet':
+            self.genF = UNetGenerator()
+            self.genG = UNetGenerator()
+ 
+        else:
+            self.genF = ResNetGenerator(n_resblocks)
+            self.genG = ResNetGenerator(n_resblocks)
 
-        self.genF = Generator(n_resblocks)
-        self.discB = Discriminator()
-
-        self.genG = Generator(n_resblocks)
         self.discA = Discriminator()
+        self.discB = Discriminator()
 
         self.pool_A = ImagePool(POOL_SIZE)
         self.pool_B = ImagePool(POOL_SIZE)

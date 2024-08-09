@@ -36,6 +36,7 @@ LOG_FILE = f"./logs/{LOG_FILE_NAME}"
 IMG_RES = config.getint('params', 'IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 NUM_EPOCHS = config.getint('params', 'NUM_EPOCHS')
+GEN_ARCHITECTURE = config.get('params', 'GEN_ARCHITECTURE')
 N_RES_BLOCKS = config.getint('params', 'N_RES_BLOCKS')
 DISC_LR = config.getfloat('params', 'DISC_LR')
 GEN_LR = config.getfloat('params', 'GEN_LR')
@@ -137,7 +138,7 @@ fixed_sampleB = torch.stack([monet_dataset[idx] for idx in range(IMG_FIXED_LOG_N
 # ---------------------------------------------------------------------------- #
 
 # ------------------------------ CREATING MODEL ------------------------------ #
-model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS).cuda()
+model = CycleGAN(GAN_LOSS_FN, generator=GEN_ARCHITECTURE, n_resblocks=N_RES_BLOCKS).cuda()
 
 model.init_params()
 
@@ -178,14 +179,14 @@ def train_one_epoch(step):
     loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    setB_iter = iter(augmented_setB)
-    for real_A in augmented_setA:
-        try:
-            real_B = next(setB_iter)
-        except StopIteration:
-            setB_iter = iter(augmented_setB)
-            real_B = next(setB_iter)
-
+    # setB_iter = iter(augmented_setB)
+    # for real_A in augmented_setA:
+    #     try:
+    #         real_B = next(setB_iter)
+    #     except StopIteration:
+    #         setB_iter = iter(augmented_setB)
+    #         real_B = next(setB_iter)
+    for real_A, real_B in zip(augmented_setA, augmented_setB):
         real_A = real_A.to('cuda')
         real_B = real_B.to('cuda')
 

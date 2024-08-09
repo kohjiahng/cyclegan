@@ -18,11 +18,11 @@ class ResBlock(nn.Module):
         return x + self.block(x)
 
 class ConvInstanceNormRelu(nn.Module):
-    def __init__(self, filters, leaky=False, **kwargs):
+    def __init__(self, filters, leaky=False, norm=True,**kwargs):
         super().__init__()
         self.block = nn.Sequential(
             nn.LazyConv2d(filters, bias=False,**kwargs),
-            nn.LazyInstanceNorm2d(filters),
+            *([nn.LazyInstanceNorm2d(filters)] if norm else []),
             nn.LeakyReLU(0.2) if leaky else nn.ReLU()
         )
     def forward(self, X):
