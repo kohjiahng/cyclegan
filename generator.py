@@ -61,9 +61,9 @@ class UNetGenerator(nn.Module):
             'padding': 1
         }
         self.dec = nn.Sequential(
-            ConvTransposeInstanceNormRelu(512,**dec_kwargs),
-            ConvTransposeInstanceNormRelu(512,**dec_kwargs),
-            ConvTransposeInstanceNormRelu(512,**dec_kwargs),
+            ConvTransposeInstanceNormRelu(512,**dec_kwargs,dropout=True),
+            ConvTransposeInstanceNormRelu(512,**dec_kwargs,dropout=True),
+            ConvTransposeInstanceNormRelu(512,**dec_kwargs,dropout=True),
             ConvTransposeInstanceNormRelu(512,**dec_kwargs),
             ConvTransposeInstanceNormRelu(256,**dec_kwargs),
             ConvTransposeInstanceNormRelu(128,**dec_kwargs),

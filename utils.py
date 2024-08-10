@@ -59,15 +59,15 @@ def plot_images_with_scores(images, model, which_set):
     fig, ax = plt.subplots(3,8,figsize=(images.shape[0]*8,3*8))
     for idx in range(images.shape[0]):
         ax[0,idx].imshow((images[idx,:,:,:]+1)/2)
-        ax[0,idx].set_title(f"Score: {realscore[idx]:.3}")
+        ax[0,idx].set_title(f"Score: {realscore[idx].mean():.3}")
         ax[0,idx].axis('off')
 
         ax[1,idx].imshow((fake[idx,:,:,:]+1)/2)
-        ax[1,idx].set_title(f"Score: {fakescore[idx]:.3}")
+        ax[1,idx].set_title(f"Score: {fakescore[idx].mean():.3}")
         ax[1,idx].axis('off')
 
         ax[2,idx].imshow((regen[idx,:,:,:]+1)/2)
-        ax[2,idx].set_title(f"Score: {regenscore[idx]:.3}")
+        ax[2,idx].set_title(f"Score: {regenscore[idx].mean():.3}")
         ax[2,idx].axis('off')
 
     fig.subplots_adjust(wspace=0,hspace=0.1)

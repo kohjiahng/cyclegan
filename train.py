@@ -6,7 +6,7 @@ import wandb
 import time
 import atexit
 import os
-
+import sys
 from datasets import JPGDataset
 from torch.utils.data import DataLoader
 import torch
@@ -26,6 +26,7 @@ config.read('config.ini')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('data_dir')
+parser.add_argument('--verbose','-v',action='store_true')
 args = parser.parse_args()
 
 WANDB_PROJECT_NAME = config.get('settings','WANDB_PROJECT_NAME')
@@ -75,6 +76,9 @@ logging.basicConfig(filename=LOG_FILE,
 # Remove annoying matplotlib.font_manager and PIL logs
 logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
+
+if args.verbose:
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 logging.info(f"Num GPUs: {torch.cuda.device_count()}")
 
@@ -155,12 +159,12 @@ gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR, betas=(0.5,0.9
 
 # ------------------------------ INITIALIZATION ------------------------------ #
 
-# def init_weights(m):
-#     if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.InstanceNorm2d)):
-#         torch.nn.init.normal_(m.weight, 0.0, 0.02)
-#         if m.bias is not None:
-#             torch.nn.init.constant_(m.bias, 0.0)
-# model.apply(init_weights)
+def init_weights(m):
+    if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d, torch.nn.InstanceNorm2d)):
+        torch.nn.init.normal_(m.weight, 0.0, 0.02)
+        if m.bias is not None:
+            torch.nn.init.constant_(m.bias, 0.0)
+model.apply(init_weights)
 
 # ---------------------------------------------------------------------------- #
 #                                 TRAINING STEP                                #

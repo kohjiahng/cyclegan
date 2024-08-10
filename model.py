@@ -21,7 +21,6 @@ class CycleGAN():
         if generator == 'unet':
             self.genF = UNetGenerator()
             self.genG = UNetGenerator()
- 
         else:
             self.genF = ResNetGenerator(n_resblocks)
             self.genG = ResNetGenerator(n_resblocks)
@@ -105,22 +104,15 @@ class CycleGAN():
         return itertools.chain(self.genF.parameters(), self.genG.parameters())
 
     def eval(self):
-        self.genF.eval()
-        self.genG.eval()
-        self.discA.eval()
-        self.discB.eval()
-
+     for module in self.modules():
+            module.eval()
     def train(self):
-        self.genF.train()
-        self.genG.train()
-        self.discA.train()
-        self.discB.train()
-    
+        for module in self.modules():
+            module.train()
+   
     def cuda(self):
-        self.genF.to('cuda')
-        self.genG.to('cuda')
-        self.discA.to('cuda')
-        self.discB.to('cuda')
+        for module in self.modules():
+            module.to('cuda')
         return self
     def apply(self,fn):
         for module in self.modules():
@@ -136,7 +128,5 @@ class CycleGAN():
     def modules(self):
         return self.genF, self.genG, self.discA, self.discB
     def init_params(self):
-        self.genF(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
-        self.genG(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
-        self.discA(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
-        self.discB(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))
+        for module in self.modules():
+            module(torch.zeros((1,3,IMG_RES,IMG_RES), device='cuda'))

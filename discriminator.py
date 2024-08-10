@@ -14,16 +14,15 @@ class Discriminator(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = torch.nn.Sequential(
-            ConvInstanceNormRelu(64,kernel_size=(4,4),stride=2,leaky=True),
-            ConvInstanceNormRelu(128,kernel_size=(4,4),stride=2,leaky=True),
-            ConvInstanceNormRelu(256,kernel_size=(4,4),stride=2,leaky=True),
-            ConvInstanceNormRelu(512,kernel_size=(4,4),stride=2,leaky=True),
-            nn.Conv2d(512,1,kernel_size=(4,4), stride=1),
-            nn.Sigmoid()
+            ConvInstanceNormRelu(64,kernel_size=(4,4),stride=2,padding=1,leaky=True,norm=False),
+            ConvInstanceNormRelu(128,kernel_size=(4,4),stride=2,padding=1,leaky=True),
+            ConvInstanceNormRelu(256,kernel_size=(4,4),stride=2,padding=1,leaky=True),
+            ConvInstanceNormRelu(512,kernel_size=(4,4),stride=1,padding=1,leaky=True),
+            nn.Conv2d(512,1,kernel_size=(4,4), stride=1, padding=1),
         )
 
     def forward(self, X):
-        return torch.mean(self.model(X), dim=(1,2,3))
+        return self.model(X)
 
 if __name__ == '__main__':
     disc = Discriminator()
