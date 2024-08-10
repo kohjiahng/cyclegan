@@ -183,14 +183,14 @@ def train_one_epoch(step):
     loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    # setB_iter = iter(augmented_setB)
-    # for real_A in augmented_setA:
-    #     try:
-    #         real_B = next(setB_iter)
-    #     except StopIteration:
-    #         setB_iter = iter(augmented_setB)
-    #         real_B = next(setB_iter)
-    for real_A, real_B in zip(augmented_setA, augmented_setB):
+    setB_iter = iter(augmented_setB)
+    for real_A in augmented_setA:
+        try:
+            real_B = next(setB_iter)
+        except StopIteration:
+            setB_iter = iter(augmented_setB)
+            real_B = next(setB_iter)
+    # for real_A, real_B in zip(augmented_setA, augmented_setB):
         real_A = real_A.to('cuda')
         real_B = real_B.to('cuda')
 
