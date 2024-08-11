@@ -59,36 +59,34 @@ class CycleGAN():
             torch.concat((torch.ones_like(real_B_score), torch.zeros_like(fake_B_score)))
         )
 
-        return (loss_A + loss_B) / 2
+        return loss_A + loss_B
     
-    def gan_loss(self, real_A, fake_A, real_B, fake_B):
-        real_A_score = self.discA(real_A)
+    def gan_loss(self, fake_A, fake_B):
         fake_A_score = self.discA(fake_A)
         loss_A = self.gan_loss_fn(
-            torch.concat((real_A_score,fake_A_score)),
-            torch.concat((torch.zeros_like(real_A_score), torch.ones_like(fake_A_score)))
+            fake_A_score,
+            torch.ones_like(fake_A_score)
         )
 
-        real_B_score = self.discB(real_B)
         fake_B_score = self.discB(fake_B)
         loss_B = self.gan_loss_fn(
-            torch.concat((real_B_score,fake_B_score)),
-            torch.concat((torch.zeros_like(real_B_score), torch.ones_like(fake_B_score)))
+            fake_B_score,
+            torch.ones_like(fake_B_score)
         )
 
-        return (loss_A + loss_B) / 2
+        return loss_A + loss_B
  
     def cycle_loss(self, real_A, fake_A, real_B, fake_B):
         regen_A = self.genG(fake_B)
         regen_B = self.genF(fake_A)
 
-        return (self.cycle_loss_fn(real_A, regen_A) + self.cycle_loss_fn(real_B, regen_B)) / 2
+        return self.cycle_loss_fn(real_A, regen_A) + self.cycle_loss_fn(real_B, regen_B)
 
     def identity_loss(self, real_A, real_B):
         idt_A = self.genG(real_A)
         idt_B = self.genF(real_B)
 
-        return (self.identity_loss_fn(real_A, idt_A) + self.identity_loss_fn(real_B, idt_B)) / 2
+        return self.identity_loss_fn(real_A, idt_A) + self.identity_loss_fn(real_B, idt_B)
 
     # ---------------------------------- HELPERS --------------------------------- #
     def infer_B(self, X): # A to B

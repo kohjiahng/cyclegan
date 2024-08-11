@@ -1,6 +1,5 @@
 from datasets import JPGDataset
 from torch.utils.data import DataLoader
-from model import CycleGAN
 from configparser import ConfigParser
 import wandb
 from PIL import Image
@@ -10,7 +9,7 @@ import logging
 import os
 import torch
 import argparse
-from generator import Generator
+from generator import UNetGenerator
 import sys
 
 # ---------------------------------------------------------------------------- #
@@ -60,7 +59,7 @@ artifact = api.artifact(f"{WANDB_USER}/{WANDB_PROJECT_NAME}/{WANDB_ARTIFACT_NAME
 weight_dir = artifact.download()
 
 
-genF = Generator(N_RES_BLOCKS).cuda()
+genF = UNetGenerator().cuda()
 genF.eval()
 
 # Initalize parameter sizes (lazy modules)
