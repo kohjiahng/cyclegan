@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from configparser import ConfigParser
-from blocks import ConvInstanceNormRelu, Downsampling
+from blocks import ConvInstanceNormRelu 
 
 config = ConfigParser()
 config.read('config.ini')

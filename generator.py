@@ -1,6 +1,6 @@
 from blocks import ResBlock
 from configparser import ConfigParser
-from blocks import ConvInstanceNormRelu, ConvTransposeInstanceNormRelu, Downsampling, Upsampling
+from blocks import ConvInstanceNormRelu, ConvTransposeInstanceNormRelu
 from torch import nn
 import torch
 config = ConfigParser()

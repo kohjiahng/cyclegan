@@ -157,6 +157,14 @@ wandb.watch(model.modules(), log='all')
 disc_opt = torch.optim.Adam(model.get_disc_parameters(), lr=DISC_LR, betas=(0.5,0.999))
 gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR, betas=(0.5,0.999))
 
+def lr_lambda(epoch):
+    len_decay_phase = NUM_EPOCHS - LR_DECAY_EPOCH + 1.0
+    curr_decay_step = max(0, epoch - LR_DECAY_EPOCH + 1.0)
+    val = 1.0 - curr_decay_step / len_decay_phase
+    return max(0.0, val)
+disc_scheduler = torch.optim.lr_scheduler.LambdaLR(disc_opt, lr_lambda)
+gen_scheduler = torch.optim.lr_scheduler.LambdaLR(gen_opt, lr_lambda)
+
 # ------------------------------ INITIALIZATION ------------------------------ #
 
 def init_weights(m):
@@ -223,8 +231,6 @@ def train_one_epoch(step):
         cycle_loss_metric(cycle_loss.item())
         identity_loss_metric(identity_loss.item())
         loss_metric(loss.item())
-
-
     # ---------------------------------- LOGGING --------------------------------- #
     time_taken = time.perf_counter() - start_time
     logging.info(f"Completed epoch {step}, time = {time_taken:.0f}s")
@@ -234,8 +240,12 @@ def train_one_epoch(step):
         'cycle_loss': cycle_loss_metric.result(),
         'identity_loss': identity_loss_metric.result(),
         'loss': loss_metric.result(),
-        'time_per_epoch': time_taken
+        'time_per_epoch': time_taken,
+        'learning_rate': disc_scheduler.get_last_lr()[0]
     }, step=step)
+    
+    disc_scheduler.step()
+    gen_scheduler.step()
 
 
 # ---------------------------------------------------------------------------- #
