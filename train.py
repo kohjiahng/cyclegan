@@ -6,7 +6,7 @@ import wandb
 import time
 import atexit
 import os
-
+import sys
 from datasets import JPGDataset
 from torch.utils.data import DataLoader
 import torch
@@ -26,6 +26,7 @@ config.read('config.ini')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('data_dir')
+parser.add_argument('--verbose','-v',action='store_true')
 args = parser.parse_args()
 
 WANDB_PROJECT_NAME = config.get('settings','WANDB_PROJECT_NAME')
@@ -36,6 +37,7 @@ LOG_FILE = f"./logs/{LOG_FILE_NAME}"
 IMG_RES = config.getint('params', 'IMG_RES')
 BATCH_SIZE = config.getint('params','BATCH_SIZE')
 NUM_EPOCHS = config.getint('params', 'NUM_EPOCHS')
+GEN_ARCHITECTURE = config.get('params', 'GEN_ARCHITECTURE')
 N_RES_BLOCKS = config.getint('params', 'N_RES_BLOCKS')
 DISC_LR = config.getfloat('params', 'DISC_LR')
 GEN_LR = config.getfloat('params', 'GEN_LR')
@@ -74,6 +76,9 @@ logging.basicConfig(filename=LOG_FILE,
 # Remove annoying matplotlib.font_manager and PIL logs
 logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
+
+if args.verbose:
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 logging.info(f"Num GPUs: {torch.cuda.device_count()}")
 
@@ -137,7 +142,7 @@ fixed_sampleB = torch.stack([monet_dataset[idx] for idx in range(IMG_FIXED_LOG_N
 # ---------------------------------------------------------------------------- #
 
 # ------------------------------ CREATING MODEL ------------------------------ #
-model = CycleGAN(GAN_LOSS_FN, n_resblocks=N_RES_BLOCKS).cuda()
+model = CycleGAN(GAN_LOSS_FN, generator=GEN_ARCHITECTURE, n_resblocks=N_RES_BLOCKS).cuda()
 
 model.init_params()
 
@@ -151,6 +156,14 @@ wandb.watch(model.modules(), log='all')
 
 disc_opt = torch.optim.Adam(model.get_disc_parameters(), lr=DISC_LR, betas=(0.5,0.999))
 gen_opt = torch.optim.Adam(model.get_gen_parameters(), lr=GEN_LR, betas=(0.5,0.999))
+
+def lr_lambda(epoch):
+    len_decay_phase = NUM_EPOCHS - LR_DECAY_EPOCH + 1.0
+    curr_decay_step = max(0, epoch - LR_DECAY_EPOCH + 1.0)
+    val = 1.0 - curr_decay_step / len_decay_phase
+    return max(0.0, val)
+disc_scheduler = torch.optim.lr_scheduler.LambdaLR(disc_opt, lr_lambda)
+gen_scheduler = torch.optim.lr_scheduler.LambdaLR(gen_opt, lr_lambda)
 
 # ------------------------------ INITIALIZATION ------------------------------ #
 
@@ -178,14 +191,14 @@ def train_one_epoch(step):
     loss_metric = Mean()
 
     # --------------------------------- TRAINING --------------------------------- #
-    setB_iter = iter(augmented_setB)
-    for real_A in augmented_setA:
-        try:
-            real_B = next(setB_iter)
-        except StopIteration:
-            setB_iter = iter(augmented_setB)
-            real_B = next(setB_iter)
-
+    # setB_iter = iter(augmented_setB)
+    # for real_A in augmented_setA:
+    #     try:
+    #         real_B = next(setB_iter)
+    #     except StopIteration:
+    #         setB_iter = iter(augmented_setB)
+    #         real_B = next(setB_iter)
+    for real_A, real_B in zip(augmented_setA, augmented_setB):
         real_A = real_A.to('cuda')
         real_B = real_B.to('cuda')
 
@@ -204,7 +217,7 @@ def train_one_epoch(step):
         fake_B = model.genF(real_A)
         fake_A = model.genG(real_B)
 
-        gan_loss = model.gan_loss(real_A, fake_A, real_B, fake_B)
+        gan_loss = model.gan_loss(fake_A, fake_B)
         cycle_loss = model.cycle_loss(real_A, fake_A, real_B, fake_B)
         identity_loss = model.identity_loss(real_A, real_B)
 
@@ -218,8 +231,6 @@ def train_one_epoch(step):
         cycle_loss_metric(cycle_loss.item())
         identity_loss_metric(identity_loss.item())
         loss_metric(loss.item())
-
-
     # ---------------------------------- LOGGING --------------------------------- #
     time_taken = time.perf_counter() - start_time
     logging.info(f"Completed epoch {step}, time = {time_taken:.0f}s")
@@ -229,8 +240,12 @@ def train_one_epoch(step):
         'cycle_loss': cycle_loss_metric.result(),
         'identity_loss': identity_loss_metric.result(),
         'loss': loss_metric.result(),
-        'time_per_epoch': time_taken
+        'time_per_epoch': time_taken,
+        'learning_rate': disc_scheduler.get_last_lr()[0]
     }, step=step)
+    
+    disc_scheduler.step()
+    gen_scheduler.step()
 
 
 # ---------------------------------------------------------------------------- #

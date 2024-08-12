@@ -18,22 +18,23 @@ class ResBlock(nn.Module):
         return x + self.block(x)
 
 class ConvInstanceNormRelu(nn.Module):
-    def __init__(self, filters, leaky=False, **kwargs):
+    def __init__(self, filters, leaky=True, norm=True,**kwargs):
         super().__init__()
         self.block = nn.Sequential(
-            nn.LazyConv2d(filters, bias=False,**kwargs),
-            nn.LazyInstanceNorm2d(filters),
+            nn.LazyConv2d(filters, bias=not norm,**kwargs),
+            *([nn.InstanceNorm2d(filters, affine=True)] if norm else []),
             nn.LeakyReLU(0.2) if leaky else nn.ReLU()
         )
     def forward(self, X):
         return self.block(X)
 
 class ConvTransposeInstanceNormRelu(nn.Module):
-    def __init__(self, filters, **kwargs): 
+    def __init__(self, filters, dropout=False, **kwargs): 
         super().__init__()
         self.block = nn.Sequential(
             nn.LazyConvTranspose2d(filters,bias=False, **kwargs),
-            nn.LazyInstanceNorm2d(filters),
+            nn.InstanceNorm2d(filters, affine=True),
+            *([nn.Dropout(0.5)] if dropout else []),
             nn.ReLU()
         )
     def forward(self, X):
